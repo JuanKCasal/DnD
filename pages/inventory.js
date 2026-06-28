@@ -714,6 +714,7 @@ export async function render(container) {
       } catch (e) { toast.error(e.message); addBtn.disabled = false; }
     });
 
+    overlay.appendChild(modal);
     document.body.appendChild(overlay);
     setTimeout(() => searchInput.focus(), 50);
   }
@@ -815,6 +816,7 @@ export async function render(container) {
       } catch (e) { toast.error(e.message); saveBtn.disabled = false; }
     });
 
+    overlay.appendChild(modal);
     document.body.appendChild(overlay);
   }
 
@@ -887,6 +889,7 @@ export async function render(container) {
       } catch (e) { toast.error(e.message); saveBtn.disabled = false; }
     });
 
+    overlay.appendChild(modal);
     document.body.appendChild(overlay);
   }
 
@@ -917,8 +920,6 @@ export async function render(container) {
     h.textContent = title;
     modal.appendChild(h);
 
-    const overlay = buildOverlay();
-    overlay.appendChild(modal);
     return modal;
   }
 
