@@ -127,14 +127,12 @@ async function navigate() {
   if (!isPublic && !auth.requireAuth()) return;
 
   if (isPublic) {
-    // Remove app shell for public pages
     const shell = document.querySelector('.app-shell');
     if (shell) shell.remove();
     app.innerHTML = '';
   } else {
     const user = auth.getUser();
     if (!user) { auth.logout(); return; }
-    // Clear any leftover public page content (e.g. login page)
     if (!document.querySelector('.app-shell')) {
       app.innerHTML = '';
     }
@@ -153,4 +151,12 @@ async function navigate() {
   } catch (e) {
     console.error('Route error:', e);
     container.innerHTML = '';
-    const errEl = document.createElemen
+    const errEl = document.createElement('div');
+    errEl.style.cssText = 'padding:40px;color:var(--crimson);font-size:14px;';
+    errEl.textContent = 'Error al cargar la página: ' + e.message;
+    container.appendChild(errEl);
+  }
+}
+
+window.addEventListener('hashchange', navigate);
+window.addEventListener('DOMContentLoaded', navigate);
