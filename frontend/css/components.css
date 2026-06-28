@@ -1,0 +1,275 @@
+/* ============================================
+   TOAST NOTIFICATIONS
+   ============================================ */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  background: var(--stone);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  min-width: 280px;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: slideInRight var(--dur-normal) var(--ease-spring);
+  pointer-events: all;
+}
+
+.toast-success { border-left: 3px solid var(--success); }
+.toast-error   { border-left: 3px solid var(--crimson); }
+.toast-info    { border-left: 3px solid var(--gold); }
+.toast-dice    { border-left: 3px solid var(--gold-dim); border-color: var(--gold-dim); }
+
+.toast-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toast-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.toast-message {
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.toast-progress {
+  height: 2px;
+  background: var(--border);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.toast-progress-bar {
+  height: 100%;
+  border-radius: 1px;
+  animation: progressBar linear forwards;
+}
+
+.toast-success .toast-progress-bar { background: var(--success); }
+.toast-error   .toast-progress-bar { background: var(--crimson); }
+.toast-info    .toast-progress-bar { background: var(--gold); }
+.toast-dice    .toast-progress-bar { background: var(--gold); }
+
+/* ============================================
+   MODAL
+   ============================================ */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(9, 8, 10, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn var(--dur-normal) ease;
+  padding: 20px;
+}
+
+.modal {
+  background: var(--stone);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px;
+  min-width: 360px;
+  max-width: 560px;
+  width: 100%;
+  animation: modalIn var(--dur-normal) var(--ease-spring);
+}
+
+.modal-header {
+  margin-bottom: 20px;
+}
+
+.modal-title {
+  font-family: var(--font-display);
+  color: var(--gold);
+  font-size: 16px;
+  margin: 0;
+  font-weight: 400;
+}
+
+.modal-body {
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.modal-body p {
+  margin: 0;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+/* ============================================
+   CHARACTER CARD
+   ============================================ */
+.character-card {
+  cursor: pointer;
+}
+
+.character-card__header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.character-card__portrait {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  background: var(--stone-light);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.character-card__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.character-card__name {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ink);
+  margin: 0 0 4px;
+}
+
+.character-card__meta {
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.character-card__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.character-card__stat {
+  text-align: center;
+}
+
+.character-card__stat-value {
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.character-card__stat-label {
+  font-size: 10px;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+/* ============================================
+   EVENT ITEM
+   ============================================ */
+.event-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.event-item:last-child {
+  border-bottom: none;
+}
+
+.event-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: var(--stone-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.event-content {
+  flex: 1;
+}
+
+.event-action {
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.event-meta {
+  font-size: 11px;
+  color: var(--ink-muted);
+  margin-top: 2px;
+}
+
+/* ============================================
+   SPINNER / LOADING
+   ============================================ */
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+
+.spinner-lg {
+  width: 36px;
+  height: 36px;
+  border-width: 3px;
+}
+
+/* ============================================
+   RUNE DIVIDER
+   ============================================ */
+.rune-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 24px 0;
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+.rune-divider::before,
+.rune-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}

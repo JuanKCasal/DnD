@@ -1,0 +1,28 @@
+# Secrets — NEVER commit
+.env
+.env.*
+certs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Impeccable local config
+.impeccable/config.local.json
