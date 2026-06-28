@@ -38,7 +38,7 @@ export async function render(container) {
 
   /* ---- Stats grid ---- */
   const statsGrid = document.createElement('div');
-  statsGrid.className = 'grid-4';
+  statsGrid.className = 'grid-5';
   statsGrid.style.marginBottom = '28px';
 
   const statDefs = [
@@ -46,6 +46,7 @@ export async function render(container) {
     { icon: '🗺️', label: 'Campañas',   key: 'campaigns',  endpoint: '/campaigns?per_page=1' },
     { icon: '📅', label: 'Sesiones',   key: 'sessions',   endpoint: '/sessions?per_page=1' },
     { icon: '🧙', label: 'Personajes', key: 'characters', endpoint: '/characters?per_page=1' },
+    { icon: '⚔️', label: 'Items',      key: 'items',      endpoint: '/items?per_page=1' },
   ];
 
   const statValueEls = {};

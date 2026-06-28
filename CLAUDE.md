@@ -430,17 +430,22 @@ async def get_producer(settings):
 
 **Fix crítico:** Renombrar alias `date` → `Date` en `session_model.py` — Pydantic v2 conflicto entre nombre de campo y tipo importado `datetime.date`.
 
-### Fase 4 — Inventario y Tesoro
-- [ ] Catálogo de items con rarities
-- [ ] Inventario individual + drag-and-drop para equipar
-- [ ] Tesoro compartido por campaña + GP
-- [ ] Kafka: publicar `dnd.inventory.updated`
+### Fase 4 — Inventario y Tesoro ✅ COMPLETADA
+- [x] Catálogo de items con rarities (CRUD, filtros tipo/rareza/búsqueda)
+- [x] Inventario individual (equipar/desequipar, añadir/eliminar)
+- [x] Tesoro compartido por campaña + monedas (PP/PO/PE/PA/PC)
+- [x] Kafka: publicar `dnd.inventory.updated`
+- [x] Frontend: 3 tabs — Mi Inventario / Tesoro / Catálogo
 
-### Fase 5 — Dashboard y Notificaciones
-- [ ] Dashboard con estadísticas de comunidad
-- [ ] Kafka consumer → Discord Webhook
-- [ ] Dice roller global flotante
-- [ ] Level-up tracker
+**Bug fix:** Modal huérfano — `buildModal` creaba overlay interno que nunca llegaba al DOM; solución: `overlay.appendChild(modal)` antes de `document.body.appendChild(overlay)`.
+
+### Fase 5 — Mejoras de Comunidad ✅ COMPLETADA
+- [x] Dashboard con estadísticas de comunidad (5 stats: miembros, campañas, sesiones, personajes, items)
+- [x] Página Miembros: grid de cards, perfil con personajes, edición de rol (admin), activar/desactivar
+- [x] Level-up tracker: botón "Subir nivel" en ficha de personaje, Kafka dnd.characters.leveled_up, toast
+- [x] Editar HP desde la ficha de personaje
+- [ ] Kafka consumer → Discord Webhook (pendiente para Fase 6)
+- [ ] Dice roller global flotante (pendiente para Fase 6)
 
 ---
 
