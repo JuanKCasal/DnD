@@ -16,24 +16,55 @@ const routes = {
 const NAV_GROUPS = [
   {
     type: 'link',
+    label: 'Noticias',
+    route: '#/noticias',
+    disabled: true,
+  },
+  {
+    type: 'link',
     label: 'Dashboard',
     route: '#/dashboard',
   },
   {
     type: 'dropdown',
+    label: 'Mi DnD',
+    items: [
+      { icon: '👤', label: 'Perfil',      desc: 'Tu cuenta y preferencias', route: '#/perfil',    disabled: true },
+      { icon: '🧙', label: 'Personajes',  desc: 'Fichas y stats',           route: '#/characters'              },
+      { icon: '🎒', label: 'Inventario',  desc: 'Items, tesoro y catálogo', route: '#/inventory'               },
+    ],
+  },
+  {
+    type: 'dropdown',
     label: 'Juego',
     items: [
-      { icon: '🗺️', label: 'Campañas',   desc: 'Gestiona tus aventuras',    route: '#/campaigns'  },
-      { icon: '🧙', label: 'Personajes',  desc: 'Fichas y stats',            route: '#/characters' },
-      { icon: '📜', label: 'Sesiones',    desc: 'Crónicas y asistencia',     route: '#/sessions'   },
+      { icon: '🗺️', label: 'Campañas',   desc: 'Gestiona tus aventuras',   route: '#/campaigns'               },
+      { icon: '📜', label: 'Sesiones',    desc: 'Crónicas y asistencia',    route: '#/sessions'                },
+      { icon: '⚔️', label: 'Misiones',   desc: 'Quests y objetivos',       route: '#/misiones',  disabled: true },
+    ],
+  },
+  {
+    type: 'dropdown',
+    label: 'Mundo',
+    items: [
+      { icon: '🛡️', label: 'Clanes',            desc: 'Gremios y facciones',   route: '#/clanes',    disabled: true },
+      { icon: '🏆', label: 'Salón de la Fama',  desc: 'Los mejores aventureros', route: '#/fama',     disabled: true },
     ],
   },
   {
     type: 'dropdown',
     label: 'Comunidad',
     items: [
-      { icon: '👥', label: 'Miembros',    desc: 'Jugadores y roles',         route: '#/members'    },
-      { icon: '🎒', label: 'Inventario',  desc: 'Items, tesoro y catálogo',  route: '#/inventory'  },
+      { icon: '💬', label: 'Chat',                  desc: 'Mensajería en tiempo real', route: '#/chat',       disabled: true },
+      { icon: '📅', label: 'Calendario & Eventos',  desc: 'Próximas sesiones',         route: '#/calendario', disabled: true },
+    ],
+  },
+  {
+    type: 'dropdown',
+    label: 'Configuración',
+    items: [
+      { icon: '👥', label: 'Miembros',   desc: 'Jugadores y roles',      route: '#/members'             },
+      { icon: '📋', label: 'Event Log',  desc: 'Historial de eventos',   route: '#/eventlog', disabled: true },
     ],
   },
 ];
@@ -71,10 +102,16 @@ function renderShell(user) {
   NAV_GROUPS.forEach(group => {
     if (group.type === 'link') {
       const a = document.createElement('a');
-      a.className = 'nav-link';
-      a.href = group.route;
-      a.dataset.route = group.route;
+      a.className = 'nav-link' + (group.disabled ? ' nav-link--disabled' : '');
+      if (!group.disabled) {
+        a.href = group.route;
+        a.dataset.route = group.route;
+      }
       a.textContent = group.label;
+      if (group.disabled) {
+        a.setAttribute('aria-disabled', 'true');
+        a.addEventListener('click', e => e.preventDefault());
+      }
       links.appendChild(a);
     } else {
       const dropdown = document.createElement('div');
@@ -95,8 +132,9 @@ function renderShell(user) {
 
       group.items.forEach(item => {
         const btn = document.createElement('button');
-        btn.className = 'nav-dropdown__item';
-        btn.dataset.route = item.route;
+        btn.className = 'nav-dropdown__item' + (item.disabled ? ' nav-dropdown__item--disabled' : '');
+        if (!item.disabled) btn.dataset.route = item.route;
+        btn.disabled = item.disabled || false;
 
         const iconWrap = document.createElement('div');
         iconWrap.className = 'nav-dropdown__icon';
@@ -115,14 +153,24 @@ function renderShell(user) {
 
         text.appendChild(name);
         text.appendChild(desc);
+
+        if (item.disabled) {
+          const soon = document.createElement('span');
+          soon.className = 'nav-soon';
+          soon.textContent = 'Próximamente';
+          text.appendChild(soon);
+        }
+
         btn.appendChild(iconWrap);
         btn.appendChild(text);
         panel.appendChild(btn);
 
-        btn.addEventListener('click', () => {
-          location.hash = item.route;
-          closeDropdowns();
-        });
+        if (!item.disabled) {
+          btn.addEventListener('click', () => {
+            location.hash = item.route;
+            closeDropdowns();
+          });
+        }
       });
 
       trigger.addEventListener('click', (e) => {
@@ -233,7 +281,7 @@ function buildDrawer(user) {
   /* Nav items */
   NAV_GROUPS.forEach(group => {
     if (group.type === 'link') {
-      const a = buildDrawerLink({ icon: '⚔️', label: group.label, route: group.route });
+      const a = buildDrawerLink({ icon: '📌', label: group.label, route: group.route, disabled: group.disabled });
       panel.appendChild(a);
     } else {
       const section = document.createElement('div');
@@ -272,8 +320,9 @@ function buildDrawer(user) {
 
 function buildDrawerLink(item) {
   const btn = document.createElement('button');
-  btn.className = 'nav-drawer__link';
-  btn.dataset.route = item.route;
+  btn.className = 'nav-drawer__link' + (item.disabled ? ' nav-drawer__link--disabled' : '');
+  if (!item.disabled) btn.dataset.route = item.route;
+  btn.disabled = item.disabled || false;
 
   const iconWrap = document.createElement('div');
   iconWrap.className = 'nav-drawer__link-icon';
@@ -282,10 +331,20 @@ function buildDrawerLink(item) {
   btn.appendChild(iconWrap);
   btn.appendChild(document.createTextNode(item.label));
 
-  btn.addEventListener('click', () => {
-    location.hash = item.route;
-    closeDrawer();
-  });
+  if (item.disabled) {
+    const soon = document.createElement('span');
+    soon.className = 'nav-soon';
+    soon.textContent = 'Próximamente';
+    soon.style.marginLeft = 'auto';
+    btn.appendChild(soon);
+  }
+
+  if (!item.disabled) {
+    btn.addEventListener('click', () => {
+      location.hash = item.route;
+      closeDrawer();
+    });
+  }
 
   return btn;
 }

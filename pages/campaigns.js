@@ -215,20 +215,37 @@ export async function render(container) {
     }
     card.appendChild(footer);
 
-    /* Edit button for DM/admin */
+    /* Edit + Delete buttons for DM/admin */
     if (canCreate) {
-      const editBtn = document.createElement('button');
-      editBtn.style.cssText = `
-        position:absolute;bottom:16px;right:16px;
+      const btnBase = `
         background:transparent;border:1px solid var(--border);
-        color:var(--ink-muted);border-radius:6px;padding:4px 10px;
+        border-radius:6px;padding:4px 10px;
         font-size:11px;cursor:pointer;opacity:0;transition:opacity var(--dur-fast);
       `;
+
+      const editBtn = document.createElement('button');
+      editBtn.style.cssText = `position:absolute;bottom:16px;right:70px;color:var(--ink-muted);${btnBase}`;
       editBtn.textContent = 'Editar';
       editBtn.addEventListener('click', e => { e.stopPropagation(); openModal(c); });
       card.appendChild(editBtn);
-      card.addEventListener('mouseenter', () => { editBtn.style.opacity = '1'; });
-      card.addEventListener('mouseleave', () => { editBtn.style.opacity = '0'; });
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.style.cssText = `position:absolute;bottom:16px;right:16px;color:var(--crimson);border-color:var(--crimson)33;${btnBase}`;
+      deleteBtn.textContent = '🗑';
+      deleteBtn.title = 'Eliminar campaña';
+      deleteBtn.addEventListener('click', async e => {
+        e.stopPropagation();
+        if (!confirm(`¿Eliminar la campaña "${c.name}"? Esta acción no se puede deshacer.`)) return;
+        try {
+          await api.del(`/campaigns/${c.id}`);
+          toast.success('Campaña eliminada');
+          loadCampaigns();
+        } catch (err) { toast.error(err.message); }
+      });
+      card.appendChild(deleteBtn);
+
+      card.addEventListener('mouseenter', () => { editBtn.style.opacity = '1'; deleteBtn.style.opacity = '1'; });
+      card.addEventListener('mouseleave', () => { editBtn.style.opacity = '0'; deleteBtn.style.opacity = '0'; });
     }
 
     return card;

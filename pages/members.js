@@ -55,6 +55,14 @@ export async function render(container) {
   controls.appendChild(searchInput);
   controls.appendChild(roleFilter);
 
+  if (isAdmin) {
+    const newBtn = document.createElement('button');
+    newBtn.className = 'btn btn-primary';
+    newBtn.textContent = '+ Nuevo Miembro';
+    newBtn.addEventListener('click', () => openCreateMember());
+    controls.appendChild(newBtn);
+  }
+
   header.appendChild(titleBlock);
   header.appendChild(controls);
   page.appendChild(header);
@@ -209,7 +217,7 @@ export async function render(container) {
         background:var(--stone-light);color:var(--ink);border:1px solid var(--border);
         transition:all var(--dur-fast);
       `;
-      editBtn.textContent = '✏️ Editar rol';
+      editBtn.textContent = '✏️ Editar';
       editBtn.addEventListener('click', e => { e.stopPropagation(); openEditRole(m, card); });
 
       const toggleBtn = document.createElement('button');
@@ -327,7 +335,7 @@ export async function render(container) {
     } catch (_) { charsEl.textContent = 'No se pudieron cargar'; }
   }
 
-  /* ── Edit role modal ── */
+  /* ── Edit member modal (full profile) ── */
   function openEditRole(m, card) {
     const overlay = document.createElement('div');
     overlay.style.cssText = `
@@ -338,18 +346,31 @@ export async function render(container) {
     const modal = document.createElement('div');
     modal.style.cssText = `
       background:var(--stone);border:1px solid var(--border);border-radius:14px;
-      padding:28px;width:100%;max-width:380px;
+      padding:28px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto;
       animation:modalIn var(--dur-normal) var(--ease-spring);
       box-shadow:0 20px 60px rgba(0,0,0,0.6);
     `;
 
     const h3 = document.createElement('h3');
-    h3.style.cssText = 'font-family:var(--font-display);font-size:18px;color:var(--gold);margin:0 0 18px;';
+    h3.style.cssText = 'font-family:var(--font-display);font-size:18px;color:var(--gold);margin:0 0 20px;';
     h3.textContent = `Editar: ${m.display_name || m.username}`;
     modal.appendChild(h3);
 
-    // Role select
-    const roleLabel = buildLabel('ROL');
+    // Helpers
+    function addField(labelText, el, mt = '0') {
+      const lbl = buildLabel(labelText);
+      lbl.style.marginTop = mt;
+      modal.appendChild(lbl);
+      modal.appendChild(el);
+    }
+
+    const displayNameInput = document.createElement('input');
+    displayNameInput.type = 'text';
+    displayNameInput.value = m.display_name || '';
+    displayNameInput.placeholder = 'Nombre visible';
+    applyInputStyle(displayNameInput);
+    addField('NOMBRE', displayNameInput);
+
     const roleSelect = buildSelect([
       ['player', '🧙 Jugador'],
       ['dm', '🎲 DM'],
@@ -357,19 +378,43 @@ export async function render(container) {
     ]);
     roleSelect.value = m.role;
     applyInputStyle(roleSelect);
-    modal.appendChild(roleLabel);
-    modal.appendChild(roleSelect);
+    addField('ROL', roleSelect, '12px');
 
-    // Discord handle
-    const discordLabel = buildLabel('DISCORD');
-    discordLabel.style.marginTop = '12px';
     const discordInput = document.createElement('input');
     discordInput.type = 'text';
     discordInput.value = m.discord_handle || '';
     discordInput.placeholder = 'usuario#0000';
     applyInputStyle(discordInput);
-    modal.appendChild(discordLabel);
-    modal.appendChild(discordInput);
+    addField('DISCORD', discordInput, '12px');
+
+    const timezoneInput = document.createElement('input');
+    timezoneInput.type = 'text';
+    timezoneInput.value = m.timezone || '';
+    timezoneInput.placeholder = 'America/Santiago';
+    applyInputStyle(timezoneInput);
+    addField('ZONA HORARIA', timezoneInput, '12px');
+
+    const bioInput = document.createElement('textarea');
+    bioInput.value = m.bio || '';
+    bioInput.placeholder = 'Descripción del aventurero...';
+    bioInput.rows = 3;
+    applyInputStyle(bioInput);
+    bioInput.style.resize = 'vertical';
+    addField('BIO', bioInput, '12px');
+
+    const activeRow = document.createElement('div');
+    activeRow.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:14px;';
+    const activeCheck = document.createElement('input');
+    activeCheck.type = 'checkbox';
+    activeCheck.checked = m.active;
+    activeCheck.id = 'edit-active-check';
+    const activeLbl = document.createElement('label');
+    activeLbl.htmlFor = 'edit-active-check';
+    activeLbl.style.cssText = 'font-size:13px;color:var(--ink);cursor:pointer;';
+    activeLbl.textContent = 'Miembro activo';
+    activeRow.appendChild(activeCheck);
+    activeRow.appendChild(activeLbl);
+    modal.appendChild(activeRow);
 
     const footer = document.createElement('div');
     footer.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;margin-top:20px;';
@@ -393,16 +438,151 @@ export async function render(container) {
     saveBtn.addEventListener('click', async () => {
       saveBtn.disabled = true;
       try {
-        const body = { role: roleSelect.value };
-        if (discordInput.value !== m.discord_handle) body.discord_handle = discordInput.value;
+        const body = {};
+        if (displayNameInput.value !== (m.display_name || '')) body.display_name = displayNameInput.value;
+        if (roleSelect.value !== m.role) body.role = roleSelect.value;
+        if (discordInput.value !== (m.discord_handle || '')) body.discord_handle = discordInput.value;
+        if (timezoneInput.value !== (m.timezone || '')) body.timezone = timezoneInput.value;
+        if (bioInput.value !== (m.bio || '')) body.bio = bioInput.value;
+        if (activeCheck.checked !== m.active) body.active = activeCheck.checked;
+
+        if (Object.keys(body).length === 0) { close(); return; }
+
         await api.put(`/members/${m.id}`, body);
-        m.role = roleSelect.value;
-        m.discord_handle = discordInput.value;
+        Object.assign(m, body);
         toast.success('Miembro actualizado');
         close();
         const newCard = buildMemberCard(m, 0);
         card.replaceWith(newCard);
       } catch (err) { toast.error(err.message); saveBtn.disabled = false; }
+    });
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+  }
+
+  /* ── Create member modal (admin only) ── */
+  function openCreateMember() {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position:fixed;inset:0;background:rgba(9,8,10,0.85);backdrop-filter:blur(8px);
+      z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;
+    `;
+
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+      background:var(--stone);border:1px solid var(--border);border-radius:14px;
+      padding:28px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto;
+      animation:modalIn var(--dur-normal) var(--ease-spring);
+      box-shadow:0 20px 60px rgba(0,0,0,0.6);
+    `;
+
+    const h3 = document.createElement('h3');
+    h3.style.cssText = 'font-family:var(--font-display);font-size:18px;color:var(--gold);margin:0 0 20px;';
+    h3.textContent = '᛭ Nuevo Miembro ᛭';
+    modal.appendChild(h3);
+
+    function field(labelText, el, mt = '0') {
+      const lbl = buildLabel(labelText);
+      lbl.style.marginTop = mt;
+      modal.appendChild(lbl);
+      modal.appendChild(el);
+      return el;
+    }
+
+    const usernameInput = document.createElement('input');
+    usernameInput.type = 'text';
+    usernameInput.placeholder = 'username (sin espacios)';
+    applyInputStyle(usernameInput);
+    field('USUARIO *', usernameInput);
+
+    const displayNameInput = document.createElement('input');
+    displayNameInput.type = 'text';
+    displayNameInput.placeholder = 'Nombre visible';
+    applyInputStyle(displayNameInput);
+    field('NOMBRE', displayNameInput, '12px');
+
+    const emailInput = document.createElement('input');
+    emailInput.type = 'email';
+    emailInput.placeholder = 'correo@ejemplo.com';
+    applyInputStyle(emailInput);
+    field('EMAIL *', emailInput, '12px');
+
+    const passwordInput = document.createElement('input');
+    passwordInput.type = 'password';
+    passwordInput.placeholder = 'Contraseña inicial';
+    applyInputStyle(passwordInput);
+    field('CONTRASEÑA *', passwordInput, '12px');
+
+    const roleSelect = buildSelect([
+      ['player', '🧙 Jugador'],
+      ['dm', '🎲 DM'],
+      ['admin', '👑 Admin'],
+    ]);
+    applyInputStyle(roleSelect);
+    field('ROL', roleSelect, '12px');
+
+    const discordInput = document.createElement('input');
+    discordInput.type = 'text';
+    discordInput.placeholder = 'usuario#0000';
+    applyInputStyle(discordInput);
+    field('DISCORD', discordInput, '12px');
+
+    const errEl = document.createElement('div');
+    errEl.style.cssText = 'color:var(--crimson);font-size:12px;margin-top:10px;min-height:16px;';
+    modal.appendChild(errEl);
+
+    const footer = document.createElement('div');
+    footer.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;margin-top:16px;';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn';
+    cancelBtn.textContent = 'Cancelar';
+
+    const createBtn = document.createElement('button');
+    createBtn.className = 'btn btn-primary';
+    createBtn.textContent = 'Crear Miembro';
+
+    footer.appendChild(cancelBtn);
+    footer.appendChild(createBtn);
+    modal.appendChild(footer);
+
+    const close = () => overlay.remove();
+    cancelBtn.addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+    createBtn.addEventListener('click', async () => {
+      errEl.textContent = '';
+      const username = usernameInput.value.trim();
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+
+      if (!username || !email || !password) {
+        errEl.textContent = 'Usuario, email y contraseña son obligatorios.';
+        return;
+      }
+
+      createBtn.disabled = true;
+      try {
+        const body = {
+          username,
+          email,
+          password,
+          role: roleSelect.value,
+          display_name: displayNameInput.value.trim() || username,
+        };
+        if (discordInput.value.trim()) body.discord_handle = discordInput.value.trim();
+
+        const res = await api.post('/members', body);
+        const newMember = res.data;
+        allMembers.unshift(newMember);
+        toast.success(`Miembro "${newMember.username}" creado`);
+        close();
+        renderGrid(allMembers);
+      } catch (err) {
+        errEl.textContent = err.message;
+        createBtn.disabled = false;
+      }
     });
 
     overlay.appendChild(modal);
