@@ -1,8 +1,10 @@
 import { auth } from './auth.js';
 
 const routes = {
-  '#/login':     () => import('../pages/login.js').then(m => m.render),
-  '#/dashboard': () => import('../pages/dashboard.js').then(m => m.render),
+  '#/login':      () => import('../pages/login.js').then(m => m.render),
+  '#/dashboard':  () => import('../pages/dashboard.js').then(m => m.render),
+  '#/campaigns':  () => import('../pages/campaigns.js').then(m => m.render),
+  '#/characters': () => import('../pages/characters.js').then(m => m.render),
 };
 
 const app = document.getElementById('app');
@@ -151,12 +153,4 @@ async function navigate() {
   } catch (e) {
     console.error('Route error:', e);
     container.innerHTML = '';
-    const errEl = document.createElement('div');
-    errEl.style.cssText = 'padding:40px;color:var(--crimson);font-size:14px;';
-    errEl.textContent = 'Error al cargar la página: ' + e.message;
-    container.appendChild(errEl);
-  }
-}
-
-window.addEventListener('hashchange', navigate);
-window.addEventListener('DOMContentLoaded', navigate);
+    const errEl = document.createElemen
