@@ -40,9 +40,13 @@ class Settings(BaseSettings):
         if os.path.exists(file_path):
             return file_path
         if b64_content:
-            # Fix missing base64 padding (common when copy-pasting into Railway)
-            b64_clean = b64_content.strip()
-            b64_clean += "=" * (4 - len(b64_clean) % 4)
+            # Strip whitespace and any existing padding, then add exactly the right amount
+            b64_clean = b64_content.strip().rstrip("=")
+            remainder = len(b64_clean) % 4
+            if remainder == 2:
+                b64_clean += "=="
+            elif remainder == 3:
+                b64_clean += "="
             content = base64.b64decode(b64_clean)
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pem")
             tmp.write(content)
