@@ -742,8 +742,7 @@ export async function render(container) {
       saveBtn.textContent = 'Guardar asistencia';
 
       saveBtn.addEventListener('click', async () => {
-        console.log("[Sessions] Payload:", JSON.stringify(payload, null, 2));
-      saveBtn.disabled = true;
+        saveBtn.disabled = true;
         saveBtn.textContent = 'Guardando...';
 
         const promises = members.map(m => {

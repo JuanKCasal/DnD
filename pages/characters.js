@@ -180,6 +180,7 @@ export async function render(container) {
 
   /* ── Detail Sheet (full character) ── */
   async function openDetailSheet(charId) {
+    const user = auth.getUser();
     const overlay = document.createElement('div');
     overlay.style.cssText = `
       position:fixed;inset:0;background:rgba(9,8,10,0.85);
