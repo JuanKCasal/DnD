@@ -6,6 +6,7 @@ const routes = {
   '#/campaigns':  () => import('../pages/campaigns.js').then(m => m.render),
   '#/characters': () => import('../pages/characters.js').then(m => m.render),
   '#/sessions':   () => import('../pages/sessions.js').then(m => m.render),
+  '#/inventory':  () => import('../pages/inventory.js').then(m => m.render),
 };
 
 const app = document.getElementById('app');
@@ -66,6 +67,7 @@ function renderShell(user) {
     { label: 'Campañas',   icon: '🗺️', route: '#/campaigns' },
     { label: 'Personajes', icon: '🧙', route: '#/characters' },
     { label: 'Sesiones',   icon: '📜', route: '#/sessions' },
+    { label: 'Inventario', icon: '🎒', route: '#/inventory' },
     { section: 'Actividad' },
     { label: 'Chat',       icon: '💬', route: '#/chat' },
     { label: 'Eventos',    icon: '📅', route: '#/events' },
