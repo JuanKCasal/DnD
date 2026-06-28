@@ -11,7 +11,7 @@ _pool: asyncpg.Pool | None = None
 async def init_pool(settings: Settings) -> None:
     global _pool
     try:
-        ssl_ctx = ssl.create_default_context(cafile=settings.AIVEN_CA_CERT)
+        ssl_ctx = ssl.create_default_context(cafile=settings.get_ca_cert_path())
         ssl_ctx.check_hostname = False
         ssl_ctx.verify_mode = ssl.CERT_REQUIRED
         _pool = await asyncpg.create_pool(

@@ -1,4 +1,6 @@
-const BASE = 'http://localhost:8000/api/v1';
+const BASE = window.location.hostname === 'localhost'
+  ? 'http://localhost:8000/api/v1'
+  : 'https://dnd-production-2c64.up.railway.app/api/v1';
 
 function getToken() {
   return localStorage.getItem('dnd_token');

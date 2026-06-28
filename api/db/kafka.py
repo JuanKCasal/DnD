@@ -19,8 +19,8 @@ TOPIC_COMMUNITY_EVENT = "dnd.community.event"
 async def init_producer(settings: Settings) -> None:
     global _producer
     try:
-        ssl_ctx = ssl.create_default_context(cafile=settings.KAFKA_SSL_CA_CERT)
-        ssl_ctx.load_cert_chain(settings.KAFKA_SSL_CERT, settings.KAFKA_SSL_KEY)
+        ssl_ctx = ssl.create_default_context(cafile=settings.get_ca_cert_path())
+        ssl_ctx.load_cert_chain(settings.get_kafka_cert_path(), settings.get_kafka_key_path())
         ssl_ctx.check_hostname = False
 
         _producer = AIOKafkaProducer(
