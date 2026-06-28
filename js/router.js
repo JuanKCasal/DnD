@@ -5,6 +5,7 @@ const routes = {
   '#/dashboard':  () => import('../pages/dashboard.js').then(m => m.render),
   '#/campaigns':  () => import('../pages/campaigns.js').then(m => m.render),
   '#/characters': () => import('../pages/characters.js').then(m => m.render),
+  '#/sessions':   () => import('../pages/sessions.js').then(m => m.render),
 };
 
 const app = document.getElementById('app');
@@ -64,9 +65,10 @@ function renderShell(user) {
     { label: 'Clanes',     icon: '🏰', route: '#/clans' },
     { label: 'Campañas',   icon: '🗺️', route: '#/campaigns' },
     { label: 'Personajes', icon: '🧙', route: '#/characters' },
+    { label: 'Sesiones',   icon: '📜', route: '#/sessions' },
     { section: 'Actividad' },
     { label: 'Chat',       icon: '💬', route: '#/chat' },
-    { label: 'Eventos',    icon: '📜', route: '#/events' },
+    { label: 'Eventos',    icon: '📅', route: '#/events' },
   ];
 
   navItems.forEach(item => {
