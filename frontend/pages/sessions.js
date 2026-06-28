@@ -261,8 +261,25 @@ export async function render(container) {
       attendBtn.addEventListener('mouseenter', () => { attendBtn.style.borderColor = 'var(--gold-dim)'; attendBtn.style.color = 'var(--gold)'; });
       attendBtn.addEventListener('mouseleave', () => { attendBtn.style.borderColor = 'var(--border)'; attendBtn.style.color = 'var(--ink-muted)'; });
 
+      const deleteBtn = document.createElement('button');
+      deleteBtn.style.cssText = 'font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--crimson)33;background:transparent;color:var(--crimson);cursor:pointer;font-family:var(--font-ui);transition:all var(--dur-fast);margin-left:auto;';
+      deleteBtn.textContent = '🗑';
+      deleteBtn.title = 'Eliminar sesión';
+      deleteBtn.addEventListener('click', async e => {
+        e.stopPropagation();
+        if (!confirm(`¿Eliminar la sesión "${s.title || 'Sesión ' + s.session_number}"? Esta acción no se puede deshacer.`)) return;
+        try {
+          await api.del(`/sessions/${s.id}`);
+          toast.success('Sesión eliminada');
+          loadSessions();
+        } catch (err) { toast.error(err.message); }
+      });
+      deleteBtn.addEventListener('mouseenter', () => { deleteBtn.style.borderColor = 'var(--crimson)'; deleteBtn.style.background = 'var(--crimson-dim)'; });
+      deleteBtn.addEventListener('mouseleave', () => { deleteBtn.style.borderColor = 'var(--crimson)33'; deleteBtn.style.background = 'transparent'; });
+
       actions.appendChild(editBtn);
       actions.appendChild(attendBtn);
+      actions.appendChild(deleteBtn);
       card.appendChild(actions);
     }
 

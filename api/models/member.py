@@ -19,6 +19,7 @@ class MemberCreate(BaseModel):
     email: str
     password: str
     display_name: Optional[str] = None
+    role: Optional[str] = "player"
 
 
 class MemberUpdate(BaseModel):
@@ -27,6 +28,8 @@ class MemberUpdate(BaseModel):
     bio: Optional[str] = None
     timezone: Optional[str] = None
     discord_handle: Optional[str] = None
+    role: Optional[str] = None
+    active: Optional[bool] = None
 
 
 class MemberOut(BaseModel):

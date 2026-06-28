@@ -4,11 +4,63 @@ from datetime import datetime, timezone
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from api.dependencies import get_current_user, get_db, require_role
+from api.dependencies import get_current_user, get_db, hash_password, require_role
 from api.db.helpers import item_response, list_response, log_event, paginate, records_to_list
-from api.models.member import MemberUpdate
+from api.models.member import MemberCreate, MemberUpdate
 
 router = APIRouter(prefix="/api/v1/members", tags=["members"])
+
+
+@router.post("", response_model=dict, status_code=201)
+async def create_member(
+    body: MemberCreate,
+    conn: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(require_role("admin")),
+):
+    """Admin-only: create a member with a specific role."""
+    existing = await conn.fetchrow(
+        "SELECT id FROM members WHERE username = $1 OR email = $2",
+        body.username, body.email,
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail="Username or email already in use")
+
+    role = body.role or "player"
+    if role not in ("admin", "dm", "player"):
+        raise HTTPException(status_code=400, detail="Invalid role. Must be admin, dm, or player")
+
+    password_hash = hash_password(body.password)
+    member_id = uuid.uuid4()
+
+    try:
+        await conn.execute(
+            """
+            INSERT INTO members (id, username, email, password_hash, display_name, role)
+            VALUES ($1, $2, $3, $4, $5, $6::member_role)
+            """,
+            member_id,
+            body.username,
+            body.email,
+            password_hash,
+            body.display_name or body.username,
+            role,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    row = await conn.fetchrow(
+        "SELECT id, username, email, display_name, avatar_url, role, rank_id, bio, timezone, discord_handle, active, last_seen_at, created_at FROM members WHERE id = $1",
+        member_id,
+    )
+    await log_event(
+        conn,
+        "member.created",
+        "member",
+        target_id=str(member_id),
+        target_name=body.username,
+        actor_member_id=str(current_user["id"]),
+    )
+    return item_response(dict(row))
 
 
 @router.get("", response_model=dict)
@@ -115,10 +167,20 @@ async def update_member(
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
 
+    # Only admins can change role or active status
+    if ("role" in updates or "active" in updates) and current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can change role or active status")
+
+    if "role" in updates and updates["role"] not in ("admin", "dm", "player"):
+        raise HTTPException(status_code=400, detail="Invalid role")
+
     set_clauses = []
     params = []
     for i, (k, v) in enumerate(updates.items(), start=1):
-        set_clauses.append(f"{k} = ${i}")
+        if k == "role":
+            set_clauses.append(f"{k} = ${i}::member_role")
+        else:
+            set_clauses.append(f"{k} = ${i}")
         params.append(v)
 
     params.append(member_id)
