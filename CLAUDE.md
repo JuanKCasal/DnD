@@ -398,30 +398,37 @@ async def get_producer(settings):
 
 ## Fases de Desarrollo
 
-### Fase 1 — Base y Auth ← EMPEZAR AQUÍ
+### Fase 1 — Base y Auth ✅ COMPLETADA
 **PostgreSQL y Kafka ya están configurados y activos en Aiven.**
-- [ ] Crear `certs/ca.pem`, `certs/service.cert`, `certs/service.key` (contenidos en `.env`)
-- [ ] Verificar conexión: `psql "$DATABASE_URL" -c "SELECT version();"`
-- [ ] Ejecutar migración: `psql "$DATABASE_URL" -f db/migrations/001_initial_schema.sql`
-- [ ] FastAPI funcional: health check, CORS, lifespan con pool
-- [ ] Auth: POST `/api/v1/auth/login` y `/api/v1/auth/register`
-- [ ] Members: GET/POST/PUT `/api/v1/members`
-- [ ] Frontend: login con animación de entrada premium
-- [ ] Frontend: dashboard con stats
-- [ ] Habilitar GitHub Pages: Settings → Pages → Source: gh-pages branch
+- [x] Crear `certs/ca.pem`, `certs/service.cert`, `certs/service.key` (contenidos en `.env`)
+- [x] Verificar conexión: `psql "$DATABASE_URL" -c "SELECT version();"`
+- [x] Ejecutar migración: `psql "$DATABASE_URL" -f db/migrations/001_initial_schema.sql`
+- [x] FastAPI funcional: health check, CORS, lifespan con pool
+- [x] Auth: POST `/api/v1/auth/login` y `/api/v1/auth/register`
+- [x] Members: GET/POST/PUT `/api/v1/members`
+- [x] Frontend: login con animación de entrada premium
+- [x] Frontend: dashboard con stats
+- [x] Habilitar GitHub Pages: Settings → Pages → Source: gh-pages branch
 
-### Fase 2 — Campañas y Personajes
-- [ ] CRUD Campaigns
-- [ ] CRUD Characters con stats_json D&D 5e
-- [ ] Vinculación personaje ↔ campaña ↔ jugador
-- [ ] Frontend: página campaigns con cards animadas
-- [ ] Frontend: ficha de personaje completa
+**Notas Railway:** `api/Dockerfile` copia archivos en `./api/` para que `uvicorn api.main:app` funcione. Los certs se pasan como env vars en base64 (`AIVEN_CA_CERT_B64`, etc.) — `config.py` los decodifica con padding correcto (`rstrip('=')` + `len % 4`).
 
-### Fase 3 — Sesiones
-- [ ] CRUD Sessions + session_number automático
-- [ ] Asistencia por sesión
-- [ ] Crónicas en markdown (marked.js CDN)
-- [ ] Kafka: publicar `dnd.sessions.created`
+### Fase 2 — Campañas y Personajes ✅ COMPLETADA
+- [x] CRUD Campaigns (backend + frontend)
+- [x] CRUD Characters con stats D&D 5e (backend + frontend)
+- [ ] Vinculación personaje ↔ campaña ↔ jugador (UI pendiente — la DB ya lo soporta)
+- [x] Frontend: página campaigns con cards animadas, filtros por status, modal crear/editar
+- [x] Frontend: ficha de personaje completa con HP bar, grid de stats, counter animado, detail sheet
+
+**Nota importante:** Al editar `router.js` (o cualquier archivo JS grande), verificar siempre que el archivo no quede truncado antes de hacer commit — usar `tail -5` en bash para confirmar que cierra correctamente.
+
+### Fase 3 — Sesiones ✅ COMPLETADA
+- [x] CRUD Sessions + session_number automático
+- [x] Asistencia por sesión
+- [x] Crónicas en markdown (marked.js CDN)
+- [x] Kafka: publicar `dnd.sessions.created`
+- [x] Frontend: timeline de sesiones con cards, filtro por campaña, modal crear/editar, detail con tabs (crónica/highlights/asistencia)
+
+**Fix crítico:** Renombrar alias `date` → `Date` en `session_model.py` — Pydantic v2 conflicto entre nombre de campo y tipo importado `datetime.date`.
 
 ### Fase 4 — Inventario y Tesoro
 - [ ] Catálogo de items con rarities
