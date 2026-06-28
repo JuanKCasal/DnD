@@ -22,7 +22,22 @@ async function request(method, path, body = null) {
   }
 
   const json = await res.json();
-  if (!res.ok) throw new Error(json.error?.message || 'Error del servidor');
+  if (!res.ok) {
+    console.error('[API Error]', res.status, JSON.stringify(json));
+    // Custom error handler: { error: { message, details: [{field, message}] } }
+    // FastAPI default: { detail: [...] }
+    let msg;
+    if (json.error?.details?.length) {
+      msg = json.error.details.map(d => `${d.field}: ${d.message}`).join(' | ');
+    } else if (json.error?.message) {
+      msg = json.error.message;
+    } else if (Array.isArray(json.detail)) {
+      msg = json.detail.map(e => `${e.loc?.slice(-1)[0] ?? ''}: ${e.msg}`).join(' | ');
+    } else if (json.detail) {
+      msg = String(json.detail);
+    }
+    throw new Error(msg || 'Error del servidor');
+  }
   return json; // caller accesses .data and .meta
 }
 

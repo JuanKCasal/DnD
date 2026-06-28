@@ -600,6 +600,7 @@ export async function render(container) {
         payload.campaign_id = campSel.value;
       }
 
+      console.log("[Sessions] Payload:", JSON.stringify(payload, null, 2));
       saveBtn.disabled = true;
       saveBtn.textContent = isEdit ? 'Guardando...' : 'Creando...';
 
@@ -741,7 +742,8 @@ export async function render(container) {
       saveBtn.textContent = 'Guardar asistencia';
 
       saveBtn.addEventListener('click', async () => {
-        saveBtn.disabled = true;
+        console.log("[Sessions] Payload:", JSON.stringify(payload, null, 2));
+      saveBtn.disabled = true;
         saveBtn.textContent = 'Guardando...';
 
         const promises = members.map(m => {
