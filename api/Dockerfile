@@ -1,6 +1,5 @@
 FROM python:3.12-slim
 
-# Install build tools needed for asyncpg
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
@@ -11,7 +10,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Copy api source into /app/api/ so that `uvicorn api.main:app` works
+COPY . ./api/
 
 EXPOSE 8000
 

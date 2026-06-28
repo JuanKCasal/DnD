@@ -11,7 +11,6 @@ COPY api/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY api/ ./api/
-COPY certs/ ./certs/
 
 EXPOSE 8000
 
