@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date as Date, datetime
 from uuid import UUID
 from typing import Optional
 from pydantic import BaseModel
@@ -7,7 +7,7 @@ from pydantic import BaseModel
 class SessionCreate(BaseModel):
     campaign_id: UUID
     title: Optional[str] = None
-    date: Optional[date] = None
+    date: Optional[Date] = None
     duration_min: Optional[int] = None
     summary: Optional[str] = None
     highlights: Optional[list[str]] = None
@@ -17,7 +17,7 @@ class SessionCreate(BaseModel):
 
 class SessionUpdate(BaseModel):
     title: Optional[str] = None
-    date: Optional[date] = None
+    date: Optional[Date] = None
     duration_min: Optional[int] = None
     summary: Optional[str] = None
     highlights: Optional[list[str]] = None
@@ -30,7 +30,7 @@ class SessionOut(BaseModel):
     campaign_id: UUID
     session_number: int
     title: Optional[str] = None
-    date: Optional[date] = None
+    date: Optional[Date] = None
     duration_min: Optional[int] = None
     summary: Optional[str] = None
     highlights: Optional[list[str]] = None
