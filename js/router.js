@@ -7,6 +7,7 @@ const routes = {
   '#/characters': () => import('../pages/characters.js').then(m => m.render),
   '#/sessions':   () => import('../pages/sessions.js').then(m => m.render),
   '#/inventory':  () => import('../pages/inventory.js').then(m => m.render),
+  '#/members':   () => import('../pages/members.js').then(m => m.render),
 };
 
 const app = document.getElementById('app');

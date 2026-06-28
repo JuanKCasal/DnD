@@ -276,6 +276,61 @@ export async function render(container) {
     shHeader.style.position = 'relative';
     shHeader.appendChild(closeBtn);
 
+    /* ── Level-up action bar ── */
+    const isSelf = String(c.member_id) === String(user?.id);
+    const canLevelUp = isSelf || user?.role === 'admin' || user?.role === 'dm';
+    if (canLevelUp && (c.level ?? 1) < 20) {
+      const actionBar = document.createElement('div');
+      actionBar.style.cssText = 'padding:12px 32px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;';
+
+      const lvlUpBtn = document.createElement('button');
+      lvlUpBtn.className = 'btn btn-primary';
+      lvlUpBtn.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:13px;';
+      lvlUpBtn.innerHTML = '<span style="font-size:16px;">⬆️</span> Subir a Nivel ' + ((c.level ?? 1) + 1);
+      lvlUpBtn.addEventListener('click', async () => {
+        const newLevel = (c.level ?? 1) + 1;
+        if (!confirm(`¿Subir a ${c.name} al Nivel ${newLevel}?`)) return;
+        lvlUpBtn.disabled = true;
+        try {
+          await api.put('/characters/' + c.id, { level: newLevel });
+          toast.success('🎉 ¡' + c.name + ' ha alcanzado el Nivel ' + newLevel + '!');
+          c.level = newLevel;
+          lvlUpBtn.innerHTML = '<span style="font-size:16px;">⬆️</span> Subir a Nivel ' + (newLevel + 1);
+          lvlUpBtn.disabled = newLevel >= 20;
+          // Update level badge on card
+          const badge = document.querySelector(`[data-char-id="${c.id}"] .lvl-badge`);
+          if (badge) badge.textContent = '#' + newLevel;
+        } catch (e) { toast.error(e.message); lvlUpBtn.disabled = false; }
+      });
+
+      actionBar.appendChild(lvlUpBtn);
+
+      const hpBtn = document.createElement('button');
+      hpBtn.className = 'btn';
+      hpBtn.style.cssText = 'font-size:13px;';
+      hpBtn.textContent = '❤️ Editar HP';
+      hpBtn.addEventListener('click', () => {
+        const newHp = prompt(`HP actual: ${c.hp}/${c.max_hp}\nNuevo HP:`, c.hp);
+        if (newHp === null) return;
+        const val = parseInt(newHp);
+        if (isNaN(val)) return;
+        api.patch('/characters/' + c.id + '/hp', { hp: val }).then(() => {
+          c.hp = val;
+          toast.success('HP actualizado');
+          const bar = wrap.querySelector('#hp-bar');
+          if (bar && c.max_hp > 0) {
+            const pct = Math.max(0, Math.min(100, (val / c.max_hp) * 100));
+            bar.style.width = pct + '%';
+          }
+          const hpSpan = wrap.querySelector('#hp-display');
+          if (hpSpan) hpSpan.textContent = val + ' / ' + c.max_hp;
+        }).catch(e => toast.error(e.message));
+      });
+      actionBar.appendChild(hpBtn);
+
+      wrap.appendChild(actionBar);
+    }
+
     /* ── HP Bar full ── */
     const hpPct = c.max_hp > 0 ? Math.max(0, Math.min(100, (c.hp / c.max_hp) * 100)) : 0;
     const hpColor = hpPct > 50 ? 'var(--success)' : hpPct > 25 ? 'var(--warning)' : 'var(--crimson)';
