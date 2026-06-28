@@ -94,7 +94,7 @@ body {
 }
 
 .app-nav__inner {
-  max-width: 1280px;
+  max-width: 1300px;
   width: 100%;
   margin: 0 auto;
   padding: 0 40px;
@@ -373,6 +373,9 @@ body {
 /* ---- Main Content Area ---- */
 .main-content {
   min-height: calc(100vh - var(--nav-height));
+  max-width: 1300px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* ============================================

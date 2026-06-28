@@ -347,4 +347,7 @@ function emptyState(icon, text) {
   const textEl = document.createElement('p');
   textEl.textContent = text;
 
-  el.
+  el.appendChild(iconEl);
+  el.appendChild(textEl);
+  return el;
+}
