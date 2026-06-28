@@ -132,6 +132,10 @@ async function navigate() {
   } else {
     const user = auth.getUser();
     if (!user) { auth.logout(); return; }
+    // Clear any leftover public page content (e.g. login page)
+    if (!document.querySelector('.app-shell')) {
+      app.innerHTML = '';
+    }
     renderShell(user);
     updateActiveNav(hash);
   }
