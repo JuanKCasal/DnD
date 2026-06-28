@@ -18,6 +18,7 @@ export async function render(container) {
   /* ---- Page wrapper ---- */
   const page = document.createElement('div');
   page.className = 'page-enter';
+  page.style.cssText = 'padding:32px 40px;max-width:1200px;';
 
   /* ---- Header ---- */
   const header = document.createElement('div');
@@ -346,7 +347,4 @@ function emptyState(icon, text) {
   const textEl = document.createElement('p');
   textEl.textContent = text;
 
-  el.appendChild(iconEl);
-  el.appendChild(textEl);
-  return el;
-}
+  el.
