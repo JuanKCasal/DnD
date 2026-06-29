@@ -135,4 +135,7 @@ class CharacterOut(BaseModel):
     active: bool
     inspiration: bool
     xp: int
-    cre
+    notes: Optional[str] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
