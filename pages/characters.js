@@ -210,13 +210,13 @@ export async function render(container) {
       const res = await api.get(`/characters/${charId}`);
       const c = res.data;
       sheet.innerHTML = '';
-      sheet.appendChild(buildFullSheet(c, overlay));
+      sheet.appendChild(buildFullSheet(c, overlay, user));
     } catch (err) {
       sheet.innerHTML = `<div style="padding:40px;color:var(--crimson);">Error: ${err.message}</div>`;
     }
   }
 
-  function buildFullSheet(c, overlay) {
+  function buildFullSheet(c, overlay, user) {
     const wrap = document.createElement('div');
 
     /* ── Header ── */
