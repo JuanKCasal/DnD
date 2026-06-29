@@ -447,6 +447,41 @@ async def get_producer(settings):
 - [ ] Kafka consumer → Discord Webhook (pendiente para Fase 6)
 - [ ] Dice roller global flotante (pendiente para Fase 6)
 
+### Fase 6 — Rediseño UI + CRUD Completo ✅ COMPLETADA
+
+#### Rediseño visual (light theme + nav horizontal)
+- [x] **Tema claro** — tokens CSS completamente reescritos: `--void:#F5F3EE`, `--stone:#FFFFFF`, `--gold:#7A5C0A`, `--ink:#1A1714`
+- [x] **Nav horizontal** reemplaza el sidebar: `header.app-nav` fijo, `max-width:1300px`, hamburger en mobile
+- [x] **Mega-menu dropdown** con paneles de items (icono + nombre + descripción)
+- [x] **Drawer mobile** con backdrop y panel deslizante
+- [x] **Fondo del nav transparente** (`var(--void)`) sin borde inferior — estilo Eleken
+- [x] **Nueva estructura de navegación:**
+  - Noticias *(deshabilitado)*
+  - Dashboard
+  - Mi DnD: Personajes, Inventario | Perfil *(deshabilitado)*
+  - Juego: Campañas, Sesiones | Misiones *(deshabilitado)*
+  - Mundo: Clanes, Salón de la Fama *(deshabilitados)*
+  - Comunidad: Chat, Calendario & Eventos *(deshabilitados)*
+  - Configuración: Miembros | Event Log *(deshabilitado)*
+- [x] Items deshabilitados: badge "Próximamente", `cursor:not-allowed`, no clickeables
+- [x] **max-width global 1300px** en nav, main-content y todas las páginas
+
+#### CRUD Miembros completo (admin)
+- [x] `POST /api/v1/members` — endpoint admin-only para crear miembros con rol específico
+- [x] `MemberUpdate` acepta `role` y `active` (solo admin puede cambiarlos)
+- [x] Botón **"+ Nuevo Miembro"** en la página (solo admin) → modal de creación completo
+- [x] Modal de edición upgradado a perfil completo: nombre, rol, discord, timezone, bio, activo/inactivo
+
+#### Eliminar registros
+- [x] **Eliminar campaña** — botón 🗑 en hover junto a "Editar", con confirmación → `DELETE /api/v1/campaigns/{id}`
+- [x] **Eliminar sesión** — botón 🗑 en la barra de acciones de cada card → `DELETE /api/v1/sessions/{id}`
+
+#### Fixes aplicados en esta fase
+- `dashboard.js` truncado → restaurado `emptyState()` completo
+- `user is not defined` en personajes → `auth.getUser()` movido al scope correcto de `openDetailSheet()`
+- Botón asistencia silencioso → eliminado `console.log` con `payload` undefined que bloqueaba el handler
+- `active` y `role` en `MemberUpdate` con cast correcto `::member_role` en SQL
+
 ---
 
 ## Instrucciones para el Agente (Claude Code)
