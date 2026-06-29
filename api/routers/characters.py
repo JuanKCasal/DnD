@@ -382,4 +382,25 @@ async def remove_from_inventory(
     if not row:
         raise HTTPException(status_code=404, detail="Character not found")
     if not _can_edit(current_user, row["member_id"]):
-        raise HTTPExcepti
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    await conn.execute(
+        "DELETE FROM character_inventory WHERE character_id = $1 AND item_id = $2",
+        char_id, item_id,
+    )
+
+
+def _character_select() -> str:
+    return """
+    SELECT c.id, c.member_id, c.campaign_id, c.name, c.portrait_url,
+           c.race, c.subrace, c.class AS char_class, c.subclass,
+           c.level, c.background, c.alignment, c.deity, c.xp, c.inspiration,
+           c.str AS str_score, c.dex AS dex_score, c.con AS con_score,
+           c.int AS int_score, c.wis AS wis_score, c.cha AS cha_score,
+           c.hp, c.max_hp, c.temp_hp, c.ac, c.initiative_bonus, c.speed,
+           c.prof_bonus, c.passive_perception,
+           c.spell_slots, c.conditions, c.feats, c.saving_throws, c.skills,
+           c.backstory, c.personality_traits, c.ideals, c.bonds, c.flaws,
+           c.active, c.created_at
+    FROM characters c
+    """
