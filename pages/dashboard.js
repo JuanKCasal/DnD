@@ -18,7 +18,7 @@ export async function render(container) {
   /* ---- Page wrapper ---- */
   const page = document.createElement('div');
   page.className = 'page-enter';
-  page.style.cssText = 'padding:32px 40px;max-width:1200px;';
+  page.style.cssText = 'padding:32px 40px;max-width:1300px;';
 
   /* ---- Header ---- */
   const header = document.createElement('div');

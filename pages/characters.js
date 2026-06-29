@@ -20,7 +20,7 @@ export async function render(container) {
 
   const page = document.createElement('div');
   page.className = 'page-characters fade-in';
-  page.style.cssText = 'padding:32px 40px;max-width:1200px;';
+  page.style.cssText = 'padding:32px 40px;max-width:1300px;';
 
   /* Header */
   const header = document.createElement('div');
@@ -662,6 +662,4 @@ export async function render(container) {
       if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
     });
 
-    setTimeout(() => form.querySelector('#f-name')?.focus(), 50);
-  }
-}
+    setTimeout(() => form.querySelector
