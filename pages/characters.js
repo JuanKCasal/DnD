@@ -217,243 +217,573 @@ export async function render(container) {
   }
 
   function buildFullSheet(c, overlay, user) {
+    /* ── Helpers ── */
+    function mod(score) { return Math.floor(((score || 10) - 10) / 2); }
+    function ms(score)  { const m = mod(score); return (m >= 0 ? '+' : '') + m; }
+    function safeJson(val, fallback) {
+      if (!val) return fallback;
+      if (typeof val === 'object') return val;
+      try { return JSON.parse(val); } catch (_) { return fallback; }
+    }
+    function sectionTitle(text) {
+      const d = document.createElement('div');
+      d.style.cssText = 'font-size:10px;font-weight:700;color:var(--gold-dim);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border);';
+      d.textContent = text;
+      return d;
+    }
+    function textBlock(label, value) {
+      const d = document.createElement('div');
+      d.style.cssText = 'background:var(--stone-light);border:1px solid var(--border);border-radius:8px;padding:12px;';
+      const lbl = document.createElement('div');
+      lbl.style.cssText = 'font-size:9px;font-weight:700;color:var(--gold-dim);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;';
+      lbl.textContent = label;
+      const val = document.createElement('div');
+      val.style.cssText = 'font-size:13px;color:var(--ink-muted);line-height:1.6;white-space:pre-wrap;';
+      val.textContent = value || '—';
+      d.appendChild(lbl); d.appendChild(val);
+      return d;
+    }
+
+    const prof        = c.prof_bonus ?? 2;
+    const skills_data = safeJson(c.skills, {});
+    const saves_data  = safeJson(c.saving_throws, {});
+    const spell_slots = safeJson(c.spell_slots, {});
+    const conditions  = safeJson(c.conditions, []);
+    const feats       = safeJson(c.feats, []);
+    const lvl         = c.level ?? 1;
+
     const wrap = document.createElement('div');
 
-    /* ── Header ── */
+    /* HEADER */
     const shHeader = document.createElement('div');
-    shHeader.style.cssText = `
-      background:linear-gradient(135deg,var(--stone-light),var(--stone));
-      padding:28px 32px;border-bottom:1px solid var(--border);
-      display:flex;align-items:flex-start;gap:20px;
-    `;
+    shHeader.style.cssText = 'background:linear-gradient(135deg,var(--stone-light),var(--stone));padding:22px 32px 18px;border-bottom:1px solid var(--border);position:relative;';
+
+    const closeBtn = document.createElement('button');
+    closeBtn.style.cssText = 'position:absolute;top:14px;right:16px;background:transparent;border:none;color:var(--ink-muted);font-size:22px;cursor:pointer;line-height:1;';
+    closeBtn.textContent = '✕';
+    closeBtn.addEventListener('click', () => overlay.remove());
+    shHeader.appendChild(closeBtn);
+
+    const hTop = document.createElement('div');
+    hTop.style.cssText = 'display:flex;align-items:flex-start;gap:16px;';
 
     const avatar = document.createElement('div');
-    avatar.style.cssText = 'width:72px;height:72px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:32px;flex-shrink:0;border:2px solid var(--gold-dim);';
+    avatar.style.cssText = 'width:60px;height:60px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;border:2px solid var(--gold-dim);';
     avatar.textContent = '🧙';
 
-    const headerInfo = document.createElement('div');
-    headerInfo.style.cssText = 'flex:1;';
+    const hInfo = document.createElement('div');
+    hInfo.style.cssText = 'flex:1;min-width:0;';
 
     const charName = document.createElement('h2');
-    charName.style.cssText = 'font-family:var(--font-display);font-size:26px;color:var(--ink);margin:0 0 4px;';
+    charName.style.cssText = 'font-family:var(--font-display);font-size:22px;color:var(--ink);margin:0 0 4px;';
     charName.textContent = c.name;
 
     const charMeta = document.createElement('div');
-    charMeta.style.cssText = 'font-size:13px;color:var(--ink-muted);display:flex;gap:12px;flex-wrap:wrap;';
-    charMeta.innerHTML = [
-      c.race && `<span>🌿 ${c.race}${c.subrace ? ' ('+c.subrace+')' : ''}</span>`,
-      c.char_class && `<span>⚔️ ${c.char_class}${c.subclass ? ' — '+c.subclass : ''}</span>`,
-      c.background && `<span>📖 ${c.background}</span>`,
-      c.alignment && `<span>⚖️ ${c.alignment}</span>`,
-    ].filter(Boolean).join('');
-
-    const lvlRow = document.createElement('div');
-    lvlRow.style.cssText = 'margin-top:10px;display:flex;gap:16px;flex-wrap:wrap;';
+    charMeta.style.cssText = 'font-size:12px;color:var(--ink-muted);display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;';
     [
-      { label: 'Nivel', val: c.level ?? 1, icon: '🎖️' },
-      { label: 'CA',    val: c.ac ?? 10,   icon: '🛡️' },
-      { label: 'Vel',   val: (c.speed ?? 30) + ' ft', icon: '💨' },
-      { label: 'IBC',   val: modStr(c.initiative_bonus ?? c.dex_score ?? 10), icon: '⚡' },
-      { label: 'Perc',  val: c.passive_perception ?? 10, icon: '👁️' },
-    ].forEach(item => {
-      const badge = document.createElement('div');
-      badge.style.cssText = 'background:var(--stone);border:1px solid var(--border);border-radius:8px;padding:6px 12px;text-align:center;min-width:56px;';
-      badge.innerHTML = `<div style="font-size:16px;font-weight:700;color:var(--gold);font-family:var(--font-mono);">${item.val}</div>
-                         <div style="font-size:9px;color:var(--ink-muted);text-transform:uppercase;letter-spacing:0.06em;">${item.label}</div>`;
-      lvlRow.appendChild(badge);
+      c.race       && ('🌿 ' + c.race + (c.subrace ? ' ('+c.subrace+')' : '')),
+      c.char_class && ('⚔️ ' + c.char_class + (c.subclass ? ' — '+c.subclass : '')),
+      c.background && ('📖 ' + c.background),
+      c.alignment  && ('⚖️ ' + c.alignment),
+      c.deity      && ('🙏 ' + c.deity),
+    ].filter(Boolean).forEach(t => {
+      const s = document.createElement('span'); s.textContent = t; charMeta.appendChild(s);
     });
 
-    headerInfo.appendChild(charName);
-    headerInfo.appendChild(charMeta);
-    headerInfo.appendChild(lvlRow);
-    shHeader.appendChild(avatar);
-    shHeader.appendChild(headerInfo);
+    /* XP bar */
+    const XP_THRESHOLDS = [0,300,900,2700,6500,14000,23000,34000,48000,64000,85000,100000,120000,140000,165000,195000,225000,265000,305000,355000];
+    const xp     = c.xp ?? 0;
+    const xpNext = XP_THRESHOLDS[Math.min(lvl, 19)] ?? XP_THRESHOLDS[19];
+    const xpCurr = XP_THRESHOLDS[Math.min(lvl - 1, 19)] ?? 0;
+    const xpPct  = lvl >= 20 ? 100 : Math.min(100, ((xp - xpCurr) / (xpNext - xpCurr)) * 100);
 
-    /* Close button */
-    const closeBtn = document.createElement('button');
-    closeBtn.style.cssText = 'position:absolute;top:16px;right:16px;background:transparent;border:none;color:var(--ink-muted);font-size:20px;cursor:pointer;';
-    closeBtn.textContent = '✕';
-    closeBtn.addEventListener('click', () => overlay.remove());
-    shHeader.style.position = 'relative';
-    shHeader.appendChild(closeBtn);
+    const xpRow = document.createElement('div');
+    xpRow.style.cssText = 'display:flex;align-items:center;gap:10px;';
+    const xpLbl = document.createElement('span');
+    xpLbl.style.cssText = 'font-size:11px;color:var(--ink-muted);white-space:nowrap;';
+    xpLbl.textContent = 'Nivel ' + lvl + '  ·  ' + xp.toLocaleString() + ' XP';
+    const xpTrack = document.createElement('div');
+    xpTrack.style.cssText = 'flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;';
+    const xpFill = document.createElement('div');
+    xpFill.id = 'sh-xp-fill';
+    xpFill.style.cssText = 'height:100%;width:0%;background:var(--gold);border-radius:2px;transition:width 1.2s var(--ease-out-expo);';
+    xpTrack.appendChild(xpFill);
+    xpRow.appendChild(xpLbl);
+    if (lvl < 20) {
+      xpRow.appendChild(xpTrack);
+      const xpNext2 = document.createElement('span');
+      xpNext2.style.cssText = 'font-size:10px;color:var(--ink-faint);white-space:nowrap;';
+      xpNext2.textContent = '→ ' + xpNext.toLocaleString();
+      xpRow.appendChild(xpNext2);
+    }
 
-    /* ── Level-up action bar ── */
-    const isSelf = String(c.member_id) === String(user?.id);
-    const canLevelUp = isSelf || user?.role === 'admin' || user?.role === 'dm';
-    if (canLevelUp && (c.level ?? 1) < 20) {
+    hInfo.appendChild(charName); hInfo.appendChild(charMeta); hInfo.appendChild(xpRow);
+    hTop.appendChild(avatar); hTop.appendChild(hInfo);
+    shHeader.appendChild(hTop);
+    wrap.appendChild(shHeader);
+
+    /* ACTION BAR */
+    const isSelf  = String(c.member_id) === String(user?.id);
+    const canEdit = isSelf || user?.role === 'admin' || user?.role === 'dm';
+
+    if (canEdit) {
       const actionBar = document.createElement('div');
-      actionBar.style.cssText = 'padding:12px 32px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;';
+      actionBar.style.cssText = 'padding:10px 32px;border-bottom:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:var(--stone-light);';
 
-      const lvlUpBtn = document.createElement('button');
-      lvlUpBtn.className = 'btn btn-primary';
-      lvlUpBtn.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:13px;';
-      lvlUpBtn.innerHTML = '<span style="font-size:16px;">⬆️</span> Subir a Nivel ' + ((c.level ?? 1) + 1);
-      lvlUpBtn.addEventListener('click', async () => {
-        const newLevel = (c.level ?? 1) + 1;
-        if (!confirm(`¿Subir a ${c.name} al Nivel ${newLevel}?`)) return;
-        lvlUpBtn.disabled = true;
-        try {
-          await api.put('/characters/' + c.id, { level: newLevel });
-          toast.success('🎉 ¡' + c.name + ' ha alcanzado el Nivel ' + newLevel + '!');
-          c.level = newLevel;
-          lvlUpBtn.innerHTML = '<span style="font-size:16px;">⬆️</span> Subir a Nivel ' + (newLevel + 1);
-          lvlUpBtn.disabled = newLevel >= 20;
-          // Update level badge on card
-          const badge = document.querySelector(`[data-char-id="${c.id}"] .lvl-badge`);
-          if (badge) badge.textContent = '#' + newLevel;
-        } catch (e) { toast.error(e.message); lvlUpBtn.disabled = false; }
-      });
-
-      actionBar.appendChild(lvlUpBtn);
+      if (lvl < 20) {
+        const lvlUpBtn = document.createElement('button');
+        lvlUpBtn.className = 'btn btn-primary';
+        lvlUpBtn.style.cssText = 'font-size:12px;display:flex;align-items:center;gap:6px;';
+        lvlUpBtn.textContent = '⬆️ Subir a Nivel ' + (lvl + 1);
+        lvlUpBtn.addEventListener('click', async () => {
+          const newLevel = lvl + 1;
+          if (!confirm('¿Subir a ' + c.name + ' al Nivel ' + newLevel + '?')) return;
+          lvlUpBtn.disabled = true;
+          try {
+            await api.put('/characters/' + c.id, { level: newLevel });
+            toast.success('🎉 ¡' + c.name + ' ha alcanzado el Nivel ' + newLevel + '!');
+            overlay.remove();
+          } catch (e) { toast.error(e.message); lvlUpBtn.disabled = false; }
+        });
+        actionBar.appendChild(lvlUpBtn);
+      }
 
       const hpBtn = document.createElement('button');
       hpBtn.className = 'btn';
-      hpBtn.style.cssText = 'font-size:13px;';
+      hpBtn.style.cssText = 'font-size:12px;';
       hpBtn.textContent = '❤️ Editar HP';
       hpBtn.addEventListener('click', () => {
-        const newHp = prompt(`HP actual: ${c.hp}/${c.max_hp}\nNuevo HP:`, c.hp);
+        const newHp = prompt('HP actual: ' + c.hp + '/' + c.max_hp + '\nNuevo HP:', c.hp);
         if (newHp === null) return;
         const val = parseInt(newHp);
         if (isNaN(val)) return;
         api.patch('/characters/' + c.id + '/hp', { hp: val }).then(() => {
           c.hp = val;
           toast.success('HP actualizado');
-          const bar = wrap.querySelector('#hp-bar');
-          if (bar && c.max_hp > 0) {
+          const hpBar  = wrap.querySelector('#sh-hp-bar');
+          const hpDisp = wrap.querySelector('#sh-hp-display');
+          if (hpBar && c.max_hp > 0) {
             const pct = Math.max(0, Math.min(100, (val / c.max_hp) * 100));
-            bar.style.width = pct + '%';
+            hpBar.style.width = pct + '%';
           }
-          const hpSpan = wrap.querySelector('#hp-display');
-          if (hpSpan) hpSpan.textContent = val + ' / ' + c.max_hp;
+          if (hpDisp) hpDisp.textContent = val + ' / ' + c.max_hp;
         }).catch(e => toast.error(e.message));
       });
       actionBar.appendChild(hpBtn);
-
       wrap.appendChild(actionBar);
     }
 
-    /* ── HP Bar full ── */
-    const hpPct = c.max_hp > 0 ? Math.max(0, Math.min(100, (c.hp / c.max_hp) * 100)) : 0;
-    const hpColor = hpPct > 50 ? 'var(--success)' : hpPct > 25 ? 'var(--warning)' : 'var(--crimson)';
+    /* TABS */
+    const tabDefs = [
+      { id: 'general',     label: 'General' },
+      { id: 'habilidades', label: 'Habilidades' },
+      { id: 'hechizos',    label: 'Hechizos' },
+      { id: 'rasgos',      label: 'Rasgos' },
+    ];
 
-    const hpSection = document.createElement('div');
-    hpSection.style.cssText = 'padding:16px 32px;border-bottom:1px solid var(--border);';
-    hpSection.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <span style="font-size:12px;font-weight:600;color:var(--ink-muted);text-transform:uppercase;letter-spacing:0.06em;">Puntos de Golpe</span>
-        <span style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:var(--ink);">${c.hp ?? 0} / ${c.max_hp ?? 0}${c.temp_hp ? ' <span style="color:var(--success);font-size:13px;">(+'+c.temp_hp+' temp)</span>' : ''}</span>
-      </div>
-      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;">
-        <div id="hp-bar" style="height:100%;width:0%;background:linear-gradient(90deg,${hpColor},${hpColor}88);border-radius:4px;transition:width 1s var(--ease-out-expo);"></div>
-      </div>`;
+    const tabBar = document.createElement('div');
+    tabBar.style.cssText = 'display:flex;border-bottom:1px solid var(--border);background:var(--stone);overflow-x:auto;';
 
-    /* ── Ability Scores grid ── */
-    const statsSection = document.createElement('div');
-    statsSection.style.cssText = 'padding:24px 32px;border-bottom:1px solid var(--border);';
+    const panels = {};
+    tabDefs.forEach(t => {
+      const btn = document.createElement('button');
+      btn.style.cssText = 'padding:12px 18px;border:none;background:transparent;cursor:pointer;font-size:12px;font-weight:600;color:var(--ink-muted);border-bottom:2px solid transparent;transition:all 150ms;font-family:var(--font-ui);white-space:nowrap;';
+      btn.textContent = t.label;
+      btn.dataset.tab = t.id;
+      btn.addEventListener('click', () => {
+        tabBar.querySelectorAll('button').forEach(b => { b.style.color='var(--ink-muted)'; b.style.borderBottomColor='transparent'; });
+        btn.style.color = 'var(--gold)';
+        btn.style.borderBottomColor = 'var(--gold)';
+        Object.values(panels).forEach(p => { p.style.display = 'none'; });
+        panels[t.id].style.display = 'block';
+      });
+      tabBar.appendChild(btn);
 
-    const statsTitle = document.createElement('div');
-    statsTitle.style.cssText = 'font-size:11px;font-weight:600;color:var(--ink-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:16px;';
-    statsTitle.textContent = 'Puntuaciones de Característica';
-
-    const statsGrid = document.createElement('div');
-    statsGrid.style.cssText = 'display:grid;grid-template-columns:repeat(6,1fr);gap:8px;';
-
-    Object.entries(STAT_LABELS).forEach(([key, label]) => {
-      const val = c[key] ?? 10;
-      const mod = modStr(val);
-      const cell = document.createElement('div');
-      cell.style.cssText = `
-        background:var(--stone-light);border:1px solid var(--border);border-radius:8px;
-        padding:12px 8px;text-align:center;
-        transition:border-color var(--dur-fast);
-      `;
-      cell.innerHTML = `
-        <div style="font-size:11px;font-weight:600;color:var(--gold-dim);letter-spacing:0.06em;margin-bottom:6px;">${label}</div>
-        <div class="stat-val" style="font-size:26px;font-weight:700;color:var(--ink);font-family:var(--font-mono);">0</div>
-        <div style="font-size:13px;color:var(--ink-muted);margin-top:2px;">${mod}</div>
-      `;
-      cell.addEventListener('mouseenter', () => { cell.style.borderColor = 'var(--gold-dim)'; });
-      cell.addEventListener('mouseleave', () => { cell.style.borderColor = 'var(--border)'; });
-      statsGrid.appendChild(cell);
-
-      /* Animate counter */
-      animateCounter(cell.querySelector('.stat-val'), val);
+      const panel = document.createElement('div');
+      panel.style.cssText = 'padding:24px 32px;display:none;';
+      panels[t.id] = panel;
     });
 
-    statsSection.appendChild(statsTitle);
-    statsSection.appendChild(statsGrid);
+    wrap.appendChild(tabBar);
+    Object.values(panels).forEach(p => wrap.appendChild(p));
+    tabBar.querySelector('button').click();
 
-    /* ── Proficiency + skills ── */
-    const combatSection = document.createElement('div');
-    combatSection.style.cssText = 'padding:24px 32px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:24px;';
+    /* ─── TAB 1: GENERAL ─── */
+    const p1 = panels['general'];
 
-    const profBlock = document.createElement('div');
-    profBlock.innerHTML = `
-      <div style="font-size:11px;font-weight:600;color:var(--ink-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px;">Competencia</div>
-      <div style="font-family:var(--font-mono);font-size:28px;color:var(--gold);font-weight:700;">+${c.prof_bonus ?? 2}</div>
-      <div style="font-size:12px;color:var(--ink-muted);margin-top:4px;">Bonus de Competencia</div>
-    `;
+    /* HP */
+    const hpPct   = c.max_hp > 0 ? Math.max(0, Math.min(100, (c.hp / c.max_hp) * 100)) : 0;
+    const hpColor = hpPct > 50 ? 'var(--success)' : hpPct > 25 ? 'var(--warning)' : 'var(--crimson)';
 
-    const inspBlock = document.createElement('div');
-    inspBlock.innerHTML = `
-      <div style="font-size:11px;font-weight:600;color:var(--ink-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px;">Inspiración</div>
-      <div style="font-size:28px;">${c.inspiration ? '✨' : '○'}</div>
-      <div style="font-size:12px;color:var(--ink-muted);margin-top:4px;">${c.inspiration ? 'Activa' : 'Sin inspiración'}</div>
-    `;
+    const hpWrap = document.createElement('div');
+    hpWrap.style.cssText = 'margin-bottom:24px;';
+    hpWrap.appendChild(sectionTitle('Puntos de Golpe'));
 
-    combatSection.appendChild(profBlock);
-    combatSection.appendChild(inspBlock);
+    const hpRow = document.createElement('div');
+    hpRow.style.cssText = 'display:flex;align-items:center;gap:16px;margin-bottom:8px;flex-wrap:wrap;';
 
-    /* ── Backstory ── */
-    let backstorySection = null;
-    if (c.backstory || c.personality_traits || c.ideals || c.bonds || c.flaws) {
-      backstorySection = document.createElement('div');
-      backstorySection.style.cssText = 'padding:24px 32px;';
+    const hpNum = document.createElement('span');
+    hpNum.id = 'sh-hp-display';
+    hpNum.style.cssText = 'font-family:var(--font-mono);font-size:28px;font-weight:700;color:var(--ink);';
+    hpNum.textContent = (c.hp ?? 0) + ' / ' + (c.max_hp ?? 0);
+    const hpLabel = document.createElement('span');
+    hpLabel.style.cssText = 'font-size:11px;color:var(--ink-muted);';
+    hpLabel.textContent = 'HP';
+    const hpMain = document.createElement('div');
+    hpMain.style.cssText = 'display:flex;align-items:baseline;gap:6px;';
+    hpMain.appendChild(hpNum); hpMain.appendChild(hpLabel);
+    hpRow.appendChild(hpMain);
 
-      const bsTitle = document.createElement('div');
-      bsTitle.style.cssText = 'font-size:11px;font-weight:600;color:var(--ink-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:16px;';
-      bsTitle.textContent = 'Trasfondo';
-
-      const bsGrid = document.createElement('div');
-      bsGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:12px;';
-
-      const traitFields = [
-        { key: 'personality_traits', label: 'Rasgos de Personalidad' },
-        { key: 'ideals', label: 'Ideales' },
-        { key: 'bonds', label: 'Vínculos' },
-        { key: 'flaws', label: 'Defectos' },
-      ];
-      traitFields.forEach(f => {
-        if (!c[f.key]) return;
-        const block = document.createElement('div');
-        block.style.cssText = 'background:var(--stone-light);border-radius:8px;padding:12px;';
-        block.innerHTML = `<div style="font-size:10px;color:var(--gold-dim);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">${f.label}</div>
-                           <div style="font-size:13px;color:var(--ink-muted);line-height:1.5;">${c[f.key]}</div>`;
-        bsGrid.appendChild(block);
-      });
-
-      if (c.backstory) {
-        const bsFull = document.createElement('div');
-        bsFull.style.cssText = 'background:var(--stone-light);border-radius:8px;padding:12px;grid-column:1/-1;margin-top:4px;';
-        bsFull.innerHTML = `<div style="font-size:10px;color:var(--gold-dim);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Historia</div>
-                            <div style="font-size:13px;color:var(--ink-muted);line-height:1.6;">${c.backstory}</div>`;
-        bsGrid.appendChild(bsFull);
-      }
-
-      backstorySection.appendChild(bsTitle);
-      backstorySection.appendChild(bsGrid);
+    if (c.temp_hp) {
+      const tempBadge = document.createElement('div');
+      tempBadge.style.cssText = 'background:rgba(61,107,79,0.2);border:1px solid var(--success);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--success);font-family:var(--font-mono);';
+      tempBadge.textContent = '+' + c.temp_hp + ' temp';
+      hpRow.appendChild(tempBadge);
     }
 
-    wrap.appendChild(shHeader);
-    wrap.appendChild(hpSection);
-    wrap.appendChild(statsSection);
-    wrap.appendChild(combatSection);
-    if (backstorySection) wrap.appendChild(backstorySection);
+    const dieMap = { 'Bárbaro':'d12','Bardo':'d8','Brujo':'d8','Clérigo':'d8','Druida':'d8','Explorador':'d10','Guerrero':'d10','Hechicero':'d6','Mago':'d6','Monje':'d8','Paladín':'d10','Pícaro':'d8' };
+    if (c.char_class) {
+      const hdBadge = document.createElement('div');
+      hdBadge.style.cssText = 'margin-left:auto;background:var(--stone-light);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--ink-muted);';
+      hdBadge.textContent = lvl + (dieMap[c.char_class] ?? 'd8') + ' Dados de Golpe';
+      hpRow.appendChild(hdBadge);
+    }
+    hpWrap.appendChild(hpRow);
 
-    /* Animate HP and stats after mount */
+    const hpTrack = document.createElement('div');
+    hpTrack.style.cssText = 'height:10px;background:var(--border);border-radius:5px;overflow:hidden;margin-bottom:14px;';
+    const hpFill = document.createElement('div');
+    hpFill.id = 'sh-hp-bar';
+    hpFill.style.cssText = 'height:100%;width:0%;background:linear-gradient(90deg,' + hpColor + ',' + hpColor + 'aa);border-radius:5px;transition:width 1s var(--ease-out-expo);';
+    hpTrack.appendChild(hpFill);
+    hpWrap.appendChild(hpTrack);
+
+    /* Death saves */
+    const deathRow = document.createElement('div');
+    deathRow.style.cssText = 'display:flex;gap:20px;flex-wrap:wrap;';
+    [['Éxitos', 'var(--success)'], ['Fallos', 'var(--crimson)']].forEach(([label, color]) => {
+      const g = document.createElement('div');
+      g.style.cssText = 'display:flex;align-items:center;gap:8px;';
+      const lbl = document.createElement('span');
+      lbl.style.cssText = 'font-size:11px;color:var(--ink-muted);';
+      lbl.textContent = label;
+      const dots = document.createElement('div');
+      dots.style.cssText = 'display:flex;gap:5px;';
+      for (let i = 0; i < 3; i++) {
+        const dot = document.createElement('div');
+        dot.style.cssText = 'width:14px;height:14px;border-radius:50%;border:1.5px solid ' + color + ';background:transparent;';
+        dots.appendChild(dot);
+      }
+      g.appendChild(lbl); g.appendChild(dots);
+      deathRow.appendChild(g);
+    });
+    hpWrap.appendChild(deathRow);
+    p1.appendChild(hpWrap);
+
+    /* Ability Scores */
+    const abilSection = document.createElement('div');
+    abilSection.style.cssText = 'margin-bottom:24px;';
+    abilSection.appendChild(sectionTitle('Puntuaciones de Característica'));
+
+    const abilGrid = document.createElement('div');
+    abilGrid.style.cssText = 'display:grid;grid-template-columns:repeat(6,1fr);gap:8px;';
+
+    const ABILITY_MAP = [
+      { key: 'str_score', abbr: 'FUE', name: 'Fuerza' },
+      { key: 'dex_score', abbr: 'DES', name: 'Destreza' },
+      { key: 'con_score', abbr: 'CON', name: 'Constitución' },
+      { key: 'int_score', abbr: 'INT', name: 'Inteligencia' },
+      { key: 'wis_score', abbr: 'SAB', name: 'Sabiduría' },
+      { key: 'cha_score', abbr: 'CAR', name: 'Carisma' },
+    ];
+    ABILITY_MAP.forEach(ab => {
+      const score = c[ab.key] ?? 10;
+      const m     = mod(score);
+      const mText = (m >= 0 ? '+' : '') + m;
+      const cell  = document.createElement('div');
+      cell.style.cssText = 'background:var(--stone-light);border:1px solid var(--border);border-radius:10px;padding:12px 6px;text-align:center;transition:border-color 150ms,transform 150ms;cursor:default;';
+      cell.title = ab.name;
+      const abbrEl = document.createElement('div');
+      abbrEl.style.cssText = 'font-size:9px;font-weight:700;color:var(--gold-dim);letter-spacing:0.08em;margin-bottom:4px;';
+      abbrEl.textContent = ab.abbr;
+      const scoreEl = document.createElement('div');
+      scoreEl.className = 'stat-counter';
+      scoreEl.style.cssText = 'font-size:28px;font-weight:700;color:var(--ink);font-family:var(--font-mono);line-height:1;';
+      scoreEl.textContent = '0';
+      const divider = document.createElement('div');
+      divider.style.cssText = 'margin:4px 0;height:1px;background:var(--border);';
+      const modEl = document.createElement('div');
+      modEl.style.cssText = 'font-size:15px;font-weight:600;color:var(--gold);font-family:var(--font-mono);';
+      modEl.textContent = mText;
+      cell.appendChild(abbrEl); cell.appendChild(scoreEl); cell.appendChild(divider); cell.appendChild(modEl);
+      cell.addEventListener('mouseenter', () => { cell.style.borderColor='var(--gold-dim)'; cell.style.transform='translateY(-2px)'; });
+      cell.addEventListener('mouseleave', () => { cell.style.borderColor='var(--border)'; cell.style.transform=''; });
+      abilGrid.appendChild(cell);
+      animateCounter(scoreEl, score);
+    });
+    abilSection.appendChild(abilGrid);
+    p1.appendChild(abilSection);
+
+    /* Combat stats */
+    const combatSection = document.createElement('div');
+    combatSection.style.cssText = 'margin-bottom:0;';
+    combatSection.appendChild(sectionTitle('Combate & Movimiento'));
+
+    const combatGrid = document.createElement('div');
+    combatGrid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px;';
+
+    const initBonus = mod(c.dex_score ?? 10) + (c.initiative_bonus ?? 0);
+    const initStr   = (initBonus >= 0 ? '+' : '') + initBonus;
+
+    [
+      { label: 'CA',                val: c.ac ?? 10 },
+      { label: 'Iniciativa',        val: initStr },
+      { label: 'Velocidad',         val: (c.speed ?? 30) + ' ft' },
+      { label: 'Percepción Pasiva', val: c.passive_perception ?? (10 + mod(c.wis_score ?? 10)) },
+      { label: 'Bonus Prof.',       val: '+' + prof },
+      { label: 'Inspiración',       val: c.inspiration ? 'Si' : 'No' },
+    ].forEach(item => {
+      const badge = document.createElement('div');
+      badge.style.cssText = 'background:var(--stone-light);border:1px solid var(--border);border-radius:8px;padding:10px 6px;text-align:center;';
+      const valEl = document.createElement('div');
+      valEl.style.cssText = 'font-size:18px;font-weight:700;color:var(--gold);font-family:var(--font-mono);';
+      valEl.textContent = String(item.val);
+      const lblEl = document.createElement('div');
+      lblEl.style.cssText = 'font-size:9px;color:var(--ink-muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:3px;line-height:1.3;';
+      lblEl.textContent = item.label;
+      badge.appendChild(valEl); badge.appendChild(lblEl);
+      combatGrid.appendChild(badge);
+    });
+    combatSection.appendChild(combatGrid);
+    p1.appendChild(combatSection);
+
+    /* ─── TAB 2: HABILIDADES ─── */
+    const p2 = panels['habilidades'];
+    p2.style.cssText = 'padding:24px 32px;display:none;';
+
+    /* Saving Throws */
+    const savesWrap = document.createElement('div');
+    savesWrap.style.cssText = 'margin-bottom:24px;';
+    savesWrap.appendChild(sectionTitle('Tiradas de Salvación'));
+    const savesGrid = document.createElement('div');
+    savesGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:6px;';
+
+    const SAVE_MAP = [
+      { key: 'str', abbr: 'Fuerza',        scoreKey: 'str_score' },
+      { key: 'dex', abbr: 'Destreza',      scoreKey: 'dex_score' },
+      { key: 'con', abbr: 'Constitución',  scoreKey: 'con_score' },
+      { key: 'int', abbr: 'Inteligencia',  scoreKey: 'int_score' },
+      { key: 'wis', abbr: 'Sabiduría',     scoreKey: 'wis_score' },
+      { key: 'cha', abbr: 'Carisma',       scoreKey: 'cha_score' },
+    ];
+    SAVE_MAP.forEach(s => {
+      const base      = mod(c[s.scoreKey] ?? 10);
+      const info      = saves_data[s.key] ?? {};
+      const proficient= !!(info.proficient || info.expert);
+      const bonus     = base + (proficient ? prof : 0);
+      const bonusStr  = (bonus >= 0 ? '+' : '') + bonus;
+      const row       = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;background:var(--stone-light);border:1px solid var(--border);';
+      const dot = document.createElement('div');
+      dot.style.cssText = 'width:10px;height:10px;border-radius:50%;border:1.5px solid ' + (proficient?'var(--gold)':'var(--border)') + ';background:' + (proficient?'var(--gold)':'transparent') + ';flex-shrink:0;';
+      const lbl = document.createElement('span');
+      lbl.style.cssText = 'font-size:12px;color:var(--ink-muted);flex:1;';
+      lbl.textContent = s.abbr;
+      const val = document.createElement('span');
+      val.style.cssText = 'font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--gold);';
+      val.textContent = bonusStr;
+      row.appendChild(dot); row.appendChild(lbl); row.appendChild(val);
+      savesGrid.appendChild(row);
+    });
+    savesWrap.appendChild(savesGrid);
+    p2.appendChild(savesWrap);
+
+    /* Skills */
+    const skillsWrap = document.createElement('div');
+    skillsWrap.style.cssText = 'margin-bottom:24px;';
+    skillsWrap.appendChild(sectionTitle('Habilidades'));
+    const skillsGrid = document.createElement('div');
+    skillsGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:5px;';
+
+    const ABBR = { str_score:'FUE', dex_score:'DES', con_score:'CON', int_score:'INT', wis_score:'SAB', cha_score:'CAR' };
+    const SKILL_MAP = [
+      { key:'acrobatics',      name:'Acrobacias',          scoreKey:'dex_score' },
+      { key:'animal_handling', name:'Trato con Animales',  scoreKey:'wis_score' },
+      { key:'arcana',          name:'Arcanos',             scoreKey:'int_score' },
+      { key:'athletics',       name:'Atletismo',           scoreKey:'str_score' },
+      { key:'deception',       name:'Engaño',              scoreKey:'cha_score' },
+      { key:'history',         name:'Historia',            scoreKey:'int_score' },
+      { key:'insight',         name:'Perspicacia',         scoreKey:'wis_score' },
+      { key:'intimidation',    name:'Intimidación',        scoreKey:'cha_score' },
+      { key:'investigation',   name:'Investigación',       scoreKey:'int_score' },
+      { key:'medicine',        name:'Medicina',            scoreKey:'wis_score' },
+      { key:'nature',          name:'Naturaleza',          scoreKey:'int_score' },
+      { key:'perception',      name:'Percepción',          scoreKey:'wis_score' },
+      { key:'performance',     name:'Actuación',           scoreKey:'cha_score' },
+      { key:'persuasion',      name:'Persuasión',          scoreKey:'cha_score' },
+      { key:'religion',        name:'Religión',            scoreKey:'int_score' },
+      { key:'sleight_of_hand', name:'Juego de Manos',      scoreKey:'dex_score' },
+      { key:'stealth',         name:'Sigilo',              scoreKey:'dex_score' },
+      { key:'survival',        name:'Supervivencia',       scoreKey:'wis_score' },
+    ];
+    SKILL_MAP.forEach(sk => {
+      const base   = mod(c[sk.scoreKey] ?? 10);
+      const info   = skills_data[sk.key] ?? {};
+      const hasPro = !!(info.proficient || info.expert);
+      const hasExp = !!info.expert;
+      const bonus  = base + (hasPro ? prof : 0) + (hasExp ? prof : 0);
+      const bStr   = (bonus >= 0 ? '+' : '') + bonus;
+      const row    = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;background:var(--stone-light);border:1px solid var(--border);';
+      const dotColor   = hasExp ? 'var(--gold)' : hasPro ? 'var(--success)' : 'transparent';
+      const dotBorder  = hasExp ? 'var(--gold)' : hasPro ? 'var(--success)' : 'var(--border)';
+      const dot = document.createElement('div');
+      dot.style.cssText = 'width:8px;height:8px;border-radius:50%;border:1.5px solid ' + dotBorder + ';background:' + dotColor + ';flex-shrink:0;';
+      dot.title = hasExp ? 'Pericia' : hasPro ? 'Competente' : '';
+      const name = document.createElement('span');
+      name.style.cssText = 'font-size:11px;color:var(--ink-muted);flex:1;';
+      name.textContent = sk.name;
+      const attr = document.createElement('span');
+      attr.style.cssText = 'font-size:9px;color:var(--ink-faint);';
+      attr.textContent = ABBR[sk.scoreKey];
+      const val = document.createElement('span');
+      val.style.cssText = 'font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--gold);min-width:26px;text-align:right;';
+      val.textContent = bStr;
+      row.appendChild(dot); row.appendChild(name); row.appendChild(attr); row.appendChild(val);
+      skillsGrid.appendChild(row);
+    });
+    skillsWrap.appendChild(skillsGrid);
+    p2.appendChild(skillsWrap);
+
+    /* Conditions */
+    if (Array.isArray(conditions) && conditions.length > 0) {
+      const condWrap = document.createElement('div');
+      condWrap.appendChild(sectionTitle('Condiciones Activas'));
+      const condList = document.createElement('div');
+      condList.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;';
+      conditions.forEach(cond => {
+        const badge = document.createElement('div');
+        badge.style.cssText = 'background:rgba(155,35,53,0.12);border:1px solid var(--crimson);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--crimson);';
+        badge.textContent = cond;
+        condList.appendChild(badge);
+      });
+      condWrap.appendChild(condList);
+      p2.appendChild(condWrap);
+    }
+
+    /* ─── TAB 3: HECHIZOS ─── */
+    const p3 = panels['hechizos'];
+    p3.style.cssText = 'padding:24px 32px;display:none;';
+    p3.appendChild(sectionTitle('Espacios de Conjuro'));
+
+    const slotKeys = Object.keys(spell_slots);
+    if (!slotKeys.length) {
+      const noSpells = document.createElement('div');
+      noSpells.style.cssText = 'text-align:center;padding:48px 20px;color:var(--ink-muted);';
+      noSpells.innerHTML = '<div style="font-size:36px;margin-bottom:12px;">📿</div><div style="font-size:13px;">Sin espacios de conjuro registrados</div>';
+      p3.appendChild(noSpells);
+    } else {
+      const slotGrid = document.createElement('div');
+      slotGrid.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:12px;';
+      for (let n = 1; n <= 9; n++) {
+        const sd = spell_slots[n] ?? spell_slots[String(n)];
+        if (!sd) continue;
+        const total = sd.total ?? 0;
+        const avail = Math.max(0, total - (sd.used ?? 0));
+        const card  = document.createElement('div');
+        card.style.cssText = 'background:var(--stone-light);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;';
+        const lvlLbl = document.createElement('div');
+        lvlLbl.style.cssText = 'font-size:9px;font-weight:700;color:var(--gold-dim);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;';
+        lvlLbl.textContent = 'Nivel ' + n;
+        const bubbles = document.createElement('div');
+        bubbles.style.cssText = 'display:flex;justify-content:center;flex-wrap:wrap;gap:5px;margin-bottom:8px;';
+        for (let i = 0; i < total; i++) {
+          const b = document.createElement('div');
+          b.style.cssText = 'width:14px;height:14px;border-radius:50%;border:1.5px solid ' + (i<avail?'var(--gold)':'var(--border)') + ';background:' + (i<avail?'var(--gold)':'transparent') + ';';
+          bubbles.appendChild(b);
+        }
+        const cnt = document.createElement('div');
+        cnt.style.cssText = 'font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--gold);';
+        cnt.textContent = avail + ' / ' + total;
+        card.appendChild(lvlLbl); card.appendChild(bubbles); card.appendChild(cnt);
+        slotGrid.appendChild(card);
+      }
+      p3.appendChild(slotGrid);
+    }
+
+    /* ─── TAB 4: RASGOS ─── */
+    const p4 = panels['rasgos'];
+    p4.style.cssText = 'padding:24px 32px;display:none;';
+
+    const personalityFields = [
+      { key:'personality_traits', label:'Rasgos de Personalidad' },
+      { key:'ideals',             label:'Ideales' },
+      { key:'bonds',              label:'Vínculos' },
+      { key:'flaws',              label:'Defectos' },
+    ].filter(f => c[f.key]);
+
+    if (personalityFields.length > 0) {
+      const pSection = document.createElement('div');
+      pSection.style.cssText = 'margin-bottom:24px;';
+      pSection.appendChild(sectionTitle('Personalidad'));
+      const pGrid = document.createElement('div');
+      pGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;';
+      personalityFields.forEach(f => pGrid.appendChild(textBlock(f.label, c[f.key])));
+      pSection.appendChild(pGrid);
+      p4.appendChild(pSection);
+    }
+
+    if (c.backstory) {
+      const bsSection = document.createElement('div');
+      bsSection.style.cssText = 'margin-bottom:24px;';
+      bsSection.appendChild(sectionTitle('Historia'));
+      bsSection.appendChild(textBlock('Trasfondo del Personaje', c.backstory));
+      p4.appendChild(bsSection);
+    }
+
+    if (c.notes) {
+      const nSection = document.createElement('div');
+      nSection.style.cssText = 'margin-bottom:24px;';
+      nSection.appendChild(sectionTitle('Notas'));
+      nSection.appendChild(textBlock('Notas', c.notes));
+      p4.appendChild(nSection);
+    }
+
+    if (Array.isArray(feats) && feats.length > 0) {
+      const fSection = document.createElement('div');
+      fSection.style.cssText = 'margin-bottom:24px;';
+      fSection.appendChild(sectionTitle('Dotes & Rasgos'));
+      feats.forEach(f => {
+        const item = document.createElement('div');
+        item.style.cssText = 'background:var(--stone-light);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;';
+        const fn = document.createElement('div');
+        fn.style.cssText = 'font-size:13px;font-weight:600;color:var(--ink);margin-bottom:4px;';
+        fn.textContent = f.name ?? String(f);
+        item.appendChild(fn);
+        if (f.description) {
+          const fd = document.createElement('div');
+          fd.style.cssText = 'font-size:12px;color:var(--ink-muted);line-height:1.5;';
+          fd.textContent = f.description;
+          item.appendChild(fd);
+        }
+        fSection.appendChild(item);
+      });
+      p4.appendChild(fSection);
+    }
+
+    if (!personalityFields.length && !c.backstory && !c.notes && !(Array.isArray(feats) && feats.length)) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'text-align:center;padding:48px;color:var(--ink-muted);';
+      empty.innerHTML = '<div style="font-size:36px;margin-bottom:12px;">📜</div><div style="font-size:13px;">Sin rasgos registrados aún</div>';
+      p4.appendChild(empty);
+    }
+
+    /* Animate after mount */
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      const bar = wrap.querySelector('#hp-bar');
+      const bar = wrap.querySelector('#sh-hp-bar');
       if (bar) bar.style.width = hpPct + '%';
+      const xpBar = wrap.querySelector('#sh-xp-fill');
+      if (xpBar) xpBar.style.width = xpPct + '%';
     }));
 
     return wrap;
