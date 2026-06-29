@@ -398,4 +398,22 @@ export async function render(container) {
           await api.post('/campaigns', body);
           toast.success('¡Campaña creada!', name);
         }
-        overla
+        overlay.remove();
+        loadCampaigns();
+      } catch (err) {
+        toast.error('Error', err.message);
+        saveBtn.disabled = false;
+        saveBtn.textContent = isEdit ? 'Guardar cambios' : 'Crear campaña';
+      }
+    });
+
+    btnRow.appendChild(cancelBtn);
+    btnRow.appendChild(saveBtn);
+    form.appendChild(btnRow);
+
+    modal.appendChild(form);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  }
+}

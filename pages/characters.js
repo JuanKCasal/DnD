@@ -662,4 +662,6 @@ export async function render(container) {
       if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
     });
 
-    setTimeout(() => form.querySelector
+    setTimeout(() => form.querySelector('#f-name').focus(), 100);
+}
+}
