@@ -18,7 +18,7 @@ export async function render(container) {
 
   const page = document.createElement('div');
   page.className = 'page-campaigns fade-in';
-  page.style.cssText = 'padding:32px 40px; max-width:1200px;';
+  page.style.cssText = 'padding:32px 40px; max-width:1300px;';
 
   /* Header */
   const header = document.createElement('div');
@@ -398,29 +398,4 @@ export async function render(container) {
           await api.post('/campaigns', body);
           toast.success('¡Campaña creada!', name);
         }
-        overlay.remove();
-        loadCampaigns();
-      } catch (err) {
-        toast.error('Error', err.message);
-        saveBtn.disabled = false;
-        saveBtn.textContent = isEdit ? 'Guardar cambios' : 'Crear campaña';
-      }
-    });
-
-    btnRow.appendChild(cancelBtn);
-    btnRow.appendChild(saveBtn);
-
-    modal.appendChild(modalTitle);
-    modal.appendChild(form);
-    modal.appendChild(btnRow);
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
-
-    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-    document.addEventListener('keydown', function esc(e) {
-      if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
-    });
-
-    setTimeout(() => form.querySelector('#camp-name')?.focus(), 50);
-  }
-}
+        overla
