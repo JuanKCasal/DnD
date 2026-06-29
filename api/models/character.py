@@ -36,6 +36,7 @@ class CharacterCreate(BaseModel):
     ideals: Optional[str] = None
     bonds: Optional[str] = None
     flaws: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class CharacterUpdate(BaseModel):
@@ -74,6 +75,7 @@ class CharacterUpdate(BaseModel):
     ideals: Optional[str] = None
     bonds: Optional[str] = None
     flaws: Optional[str] = None
+    notes: Optional[str] = None
     active: Optional[bool] = None
     inspiration: Optional[bool] = None
     xp: Optional[int] = None
@@ -133,6 +135,4 @@ class CharacterOut(BaseModel):
     active: bool
     inspiration: bool
     xp: int
-    created_at: datetime
-
-    model_config = {"from_attributes": True}
+    cre

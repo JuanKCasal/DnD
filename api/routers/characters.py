@@ -57,7 +57,9 @@ async def list_characters(
     rows = await conn.fetch(
         f"""
         SELECT c.id, c.member_id, c.campaign_id, c.name, c.race, c.class AS char_class,
-               c.level, c.hp, c.max_hp, c.ac, c.portrait_url, c.active, c.created_at
+               c.level, c.hp, c.max_hp, c.ac, c.portrait_url, c.active, c.created_at,
+               c.str AS str_score, c.dex AS dex_score, c.con AS con_score,
+               c.int AS int_score, c.wis AS wis_score, c.cha AS cha_score
         FROM characters c
         WHERE {where}
         ORDER BY c.created_at DESC
@@ -89,12 +91,12 @@ async def create_character(
             background, alignment, deity, level,
             str, dex, con, int, wis, cha,
             hp, max_hp, temp_hp, ac, initiative_bonus, speed, prof_bonus, passive_perception,
-            portrait_url, backstory, personality_traits, ideals, bonds, flaws
+            portrait_url, backstory, personality_traits, ideals, bonds, flaws, notes
         ) VALUES (
             $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::alignment_type,$11,$12,
             $13,$14,$15,$16,$17,$18,
             $19,$20,$21,$22,$23,$24,$25,$26,
-            $27,$28,$29,$30,$31,$32
+            $27,$28,$29,$30,$31,$32,$33
         )
         """,
         char_id,
@@ -129,6 +131,7 @@ async def create_character(
         body.ideals,
         body.bonds,
         body.flaws,
+        body.notes,
     )
     # Insert currency row
     try:
@@ -227,6 +230,24 @@ async def update_character(
 
     row = await conn.fetchrow(_character_select() + " WHERE c.id = $1", char_id)
     return item_response(dict(row))
+
+
+@router.delete("/{char_id}", status_code=204)
+async def delete_character(
+    char_id: uuid.UUID,
+    conn: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    row = await conn.fetchrow("SELECT member_id FROM characters WHERE id = $1", char_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Character not found")
+    if not _can_edit(current_user, row["member_id"]):
+        raise HTTPException(status_code=403, detail="Access denied")
+    await conn.execute("UPDATE characters SET active = FALSE WHERE id = $1", char_id)
+    await log_event(
+        conn, "character.deleted", "character",
+        target_id=str(char_id), actor_member_id=str(current_user["id"]),
+    )
 
 
 @router.patch("/{char_id}/hp", response_model=dict)
@@ -361,25 +382,4 @@ async def remove_from_inventory(
     if not row:
         raise HTTPException(status_code=404, detail="Character not found")
     if not _can_edit(current_user, row["member_id"]):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    await conn.execute(
-        "DELETE FROM character_inventory WHERE character_id = $1 AND item_id = $2",
-        char_id, item_id,
-    )
-
-
-def _character_select() -> str:
-    return """
-    SELECT c.id, c.member_id, c.campaign_id, c.name, c.portrait_url,
-           c.race, c.subrace, c.class AS char_class, c.subclass,
-           c.level, c.background, c.alignment, c.deity, c.xp, c.inspiration,
-           c.str AS str_score, c.dex AS dex_score, c.con AS con_score,
-           c.int AS int_score, c.wis AS wis_score, c.cha AS cha_score,
-           c.hp, c.max_hp, c.temp_hp, c.ac, c.initiative_bonus, c.speed,
-           c.prof_bonus, c.passive_perception,
-           c.spell_slots, c.conditions, c.feats, c.saving_throws, c.skills,
-           c.backstory, c.personality_traits, c.ideals, c.bonds, c.flaws,
-           c.active, c.created_at
-    FROM characters c
-    """
+        raise HTTPExcepti

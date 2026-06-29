@@ -83,36 +83,51 @@ export async function render(container) {
 
   /* ── Build character card ── */
   function buildCard(c, index) {
+    const user = auth.getUser();
+    const canEdit = user && (user.role === 'admin' || user.role === 'dm' || String(user.id) === String(c.member_id));
     const hpPct = c.max_hp > 0 ? Math.max(0, Math.min(100, (c.hp / c.max_hp) * 100)) : 0;
     const hpColor = hpPct > 50 ? 'var(--success)' : hpPct > 25 ? 'var(--warning)' : 'var(--crimson)';
 
     const card = document.createElement('div');
     card.style.cssText = `
       background:var(--stone);border:1px solid var(--border);border-radius:10px;
-      padding:0;overflow:hidden;cursor:pointer;
+      padding:0;overflow:hidden;cursor:pointer;position:relative;
       transition:transform var(--dur-fast) var(--ease-spring),box-shadow var(--dur-fast) var(--ease-spring);
       animation:fadeSlideIn var(--dur-slow) var(--ease-out-expo) ${index * 60}ms both;
     `;
+
+    /* Action bar — declared early so mouseenter/leave can reference it */
+    const actionBar = document.createElement('div');
+    actionBar.style.cssText = 'position:absolute;top:8px;left:8px;display:flex;gap:4px;opacity:0;transition:opacity var(--dur-fast) var(--ease-smooth);z-index:2;';
+
     card.addEventListener('mouseenter', () => {
       card.style.transform = 'translateY(-3px)';
       card.style.boxShadow = '0 0 0 1px var(--gold-dim), 0 0 24px var(--gold-glow)';
+      if (canEdit) actionBar.style.opacity = '1';
     });
-    card.addEventListener('mouseleave', () => { card.style.transform = ''; card.style.boxShadow = ''; });
-    card.addEventListener('click', () => openDetailSheet(c.id));
+    card.addEventListener('mouseleave', () => {
+      card.style.transform = '';
+      card.style.boxShadow = '';
+      if (canEdit) actionBar.style.opacity = '0';
+    });
+    card.addEventListener('click', (e) => {
+      if (!e.target.closest('.card-action-btn')) openDetailSheet(c.id);
+    });
 
     /* Portrait bar */
     const portrait = document.createElement('div');
     portrait.style.cssText = `
-      height:80px;background:linear-gradient(135deg,var(--stone-light),var(--border));
+      height:90px;background:linear-gradient(135deg,var(--stone-light),var(--border));
       display:flex;align-items:center;justify-content:center;
-      font-size:36px;position:relative;
+      font-size:36px;position:relative;overflow:hidden;
     `;
-    portrait.textContent = c.portrait_url ? '' : '🧙';
     if (c.portrait_url) {
       const img = document.createElement('img');
       img.src = c.portrait_url;
       img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
       portrait.appendChild(img);
+    } else {
+      portrait.textContent = '🧙';
     }
 
     /* Level badge */
@@ -127,16 +142,47 @@ export async function render(container) {
     lvlBadge.textContent = c.level || 1;
     portrait.appendChild(lvlBadge);
 
+    /* Edit/delete action buttons */
+    if (canEdit) {
+      const editBtn = document.createElement('button');
+      editBtn.className = 'card-action-btn';
+      editBtn.title = 'Editar personaje';
+      editBtn.style.cssText = 'width:26px;height:26px;border-radius:6px;border:none;cursor:pointer;background:rgba(9,8,10,0.75);color:var(--gold);font-size:13px;display:flex;align-items:center;justify-content:center;';
+      editBtn.textContent = '✏️';
+      editBtn.addEventListener('click', (e) => { e.stopPropagation(); openEditModal(c.id); });
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'card-action-btn';
+      delBtn.title = 'Eliminar personaje';
+      delBtn.style.cssText = 'width:26px;height:26px;border-radius:6px;border:none;cursor:pointer;background:rgba(9,8,10,0.75);color:var(--crimson);font-size:13px;display:flex;align-items:center;justify-content:center;';
+      delBtn.textContent = '🗑';
+      delBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!confirm(`¿Eliminar a "${c.name}"? Esta acción no se puede deshacer.`)) return;
+        try {
+          await api.del(`/characters/${c.id}`);
+          toast.success('Personaje eliminado', c.name);
+          loadCharacters();
+        } catch (err) {
+          toast.error('Error', err.message);
+        }
+      });
+
+      actionBar.appendChild(editBtn);
+      actionBar.appendChild(delBtn);
+      portrait.appendChild(actionBar);
+    }
+
     /* Body */
     const body = document.createElement('div');
     body.style.cssText = 'padding:16px;';
 
-    const name = document.createElement('div');
-    name.style.cssText = 'font-family:var(--font-display);font-size:16px;color:var(--ink);margin-bottom:4px;';
-    name.textContent = c.name;
+    const nameEl = document.createElement('div');
+    nameEl.style.cssText = 'font-family:var(--font-display);font-size:16px;color:var(--ink);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+    nameEl.textContent = c.name;
 
     const meta = document.createElement('div');
-    meta.style.cssText = 'font-size:12px;color:var(--ink-muted);margin-bottom:12px;';
+    meta.style.cssText = 'font-size:12px;color:var(--ink-muted);margin-bottom:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
     meta.textContent = [c.race, c.char_class || c.class].filter(Boolean).join(' · ');
 
     /* HP bar */
@@ -150,20 +196,20 @@ export async function render(container) {
     hpFill.style.cssText = `height:100%;width:0%;background:${hpColor};border-radius:2px;transition:width 0.8s var(--ease-out-expo);`;
     hpTrack.appendChild(hpFill);
 
-    /* Mini stats */
+    /* Mini stats — all 6 ability scores in a compact row */
     const statsRow = document.createElement('div');
-    statsRow.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:12px;';
-    ['str_score','dex_score','con_score'].forEach(k => {
+    statsRow.style.cssText = 'display:grid;grid-template-columns:repeat(6,1fr);gap:3px;margin-top:12px;';
+    ['str_score','dex_score','con_score','int_score','wis_score','cha_score'].forEach(k => {
       const val = c[k] ?? 10;
       const cell = document.createElement('div');
-      cell.style.cssText = 'text-align:center;background:var(--stone-light);border-radius:6px;padding:6px 4px;';
-      cell.innerHTML = `<div style="font-size:16px;font-weight:700;color:var(--ink);font-family:var(--font-mono);">${val}</div>
-                        <div style="font-size:9px;color:var(--gold-dim);letter-spacing:0.06em;">${STAT_LABELS[k]}</div>
-                        <div style="font-size:10px;color:var(--ink-muted);">${modStr(val)}</div>`;
+      cell.style.cssText = 'text-align:center;background:var(--stone-light);border-radius:5px;padding:5px 2px;';
+      cell.innerHTML = `<div style="font-size:13px;font-weight:700;color:var(--ink);font-family:var(--font-mono);line-height:1;">${val}</div>
+                        <div style="font-size:8px;color:var(--gold-dim);letter-spacing:0.03em;margin-top:2px;">${STAT_LABELS[k]}</div>
+                        <div style="font-size:9px;color:var(--ink-muted);">${modStr(val)}</div>`;
       statsRow.appendChild(cell);
     });
 
-    body.appendChild(name);
+    body.appendChild(nameEl);
     body.appendChild(meta);
     body.appendChild(hpLabel);
     body.appendChild(hpTrack);
@@ -803,12 +849,26 @@ export async function render(container) {
     requestAnimationFrame(step);
   }
 
-  /* ── Create Character Modal ── */
-  async function openCreateModal() {
-    /* Load campaigns for the dropdown */
+  /* ── Open Edit Modal (fetches full character first) ── */
+  async function openEditModal(charId) {
+    try {
+      const res = await api.get(`/characters/${charId}`);
+      openCharacterModal(res.data);
+    } catch (err) {
+      toast.error('Error', err.message);
+    }
+  }
+
+  /* ── Create / Edit Character Modal ── */
+  async function openCreateModal() { openCharacterModal(null); }
+
+  async function openCharacterModal(existing) {
+    const isEdit = !!existing;
+
+    /* Load campaigns for dropdown */
     let campaigns = [];
     try {
-      const res = await api.get('/campaigns?status=active');
+      const res = await api.get('/campaigns');
       campaigns = res.data ?? [];
     } catch (_) {}
 
@@ -824,108 +884,155 @@ export async function render(container) {
     const modal = document.createElement('div');
     modal.style.cssText = `
       background:var(--stone);border:1px solid var(--border);
-      border-radius:12px;padding:32px;width:100%;max-width:560px;
-      animation:modalIn var(--dur-normal) var(--ease-spring);
+      border-radius:12px;padding:32px;width:100%;max-width:680px;
+      animation:modalIn var(--dur-normal) var(--ease-spring);margin-bottom:32px;
     `;
 
     const modalTitle = document.createElement('h3');
     modalTitle.style.cssText = 'font-family:var(--font-display);color:var(--gold);margin:0 0 24px;font-size:20px;';
-    modalTitle.textContent = 'Nuevo Personaje';
+    modalTitle.textContent = isEdit ? `✏️ Editar — ${existing.name}` : '✦ Nuevo Personaje';
 
     const form = document.createElement('div');
-    form.style.cssText = 'display:flex;flex-direction:column;gap:14px;';
+    form.style.cssText = 'display:flex;flex-direction:column;gap:16px;';
 
-    /* Helper to build form row */
-    function row(label, el) {
+    /* ── Helpers ── */
+    function sectionHeader(text) {
+      const d = document.createElement('div');
+      d.style.cssText = 'font-size:10px;font-weight:700;color:var(--gold-dim);letter-spacing:0.12em;text-transform:uppercase;padding-bottom:6px;border-bottom:1px solid var(--border);margin-top:4px;';
+      d.textContent = text;
+      return d;
+    }
+
+    function fRow(label, el) {
       const g = document.createElement('div');
       const l = document.createElement('label');
-      l.style.cssText = 'display:block;font-size:11px;font-weight:600;color:var(--ink-muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;';
+      l.style.cssText = 'display:block;font-size:11px;font-weight:600;color:var(--ink-muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:5px;';
       l.textContent = label;
-      g.appendChild(l);
-      g.appendChild(el);
+      g.appendChild(l); g.appendChild(el);
       return g;
     }
 
-    function input(id, placeholder, value = '') {
+    function fInput(id, placeholder, value = '') {
       const el = document.createElement('input');
       el.type = 'text'; el.id = id; el.placeholder = placeholder; el.value = value;
-      el.className = 'input';
-      return el;
+      el.className = 'input'; return el;
     }
 
-    function numInput(id, value, min = 1, max = 30) {
+    function fNum(id, value, min = 0, max = 999) {
       const el = document.createElement('input');
       el.type = 'number'; el.id = id; el.value = value; el.min = min; el.max = max;
-      el.className = 'input';
-      return el;
+      el.className = 'input'; return el;
     }
 
-    function select(id, options, selectedVal = '') {
+    function fSelect(id, options, selectedVal = '') {
       const el = document.createElement('select');
       el.id = id; el.className = 'input';
       options.forEach(o => {
         const opt = document.createElement('option');
         const val = typeof o === 'string' ? o : o.value;
-        const label = typeof o === 'string' ? o : o.label;
-        opt.value = val; opt.textContent = label;
-        if (val === selectedVal) opt.selected = true;
+        const lbl = typeof o === 'string' ? o : o.label;
+        opt.value = val; opt.textContent = lbl;
+        if (String(val) === String(selectedVal)) opt.selected = true;
         el.appendChild(opt);
       });
       return el;
     }
 
-    /* Two-column grid for stats */
-    const statsGrid = document.createElement('div');
-    statsGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:12px;';
+    function fTextarea(id, placeholder, value = '', rows = 3) {
+      const el = document.createElement('textarea');
+      el.id = id; el.placeholder = placeholder; el.value = value; el.rows = rows;
+      el.className = 'input'; el.style.resize = 'vertical'; return el;
+    }
 
-    const statFields = [
-      { id: 'f-str', label: 'Fuerza',        min: 1, max: 30, def: 10 },
-      { id: 'f-dex', label: 'Destreza',       min: 1, max: 30, def: 10 },
-      { id: 'f-con', label: 'Constitución',   min: 1, max: 30, def: 10 },
-      { id: 'f-int', label: 'Inteligencia',   min: 1, max: 30, def: 10 },
-      { id: 'f-wis', label: 'Sabiduría',      min: 1, max: 30, def: 10 },
-      { id: 'f-cha', label: 'Carisma',        min: 1, max: 30, def: 10 },
-    ];
-    statFields.forEach(sf => {
-      const el = numInput(sf.id, sf.def, sf.min, sf.max);
-      statsGrid.appendChild(row(sf.label, el));
-    });
+    function twoCol(...children) {
+      const d = document.createElement('div');
+      d.style.cssText = `display:grid;grid-template-columns:repeat(${children.length},1fr);gap:12px;`;
+      children.forEach(c => d.appendChild(c)); return d;
+    }
 
-    /* Campaign select */
+    const BACKGROUNDS = ['Acólito','Artesano Gremial','Criminal','Ermitaño','Forajido','Héroe Popular','Marinero','Mercader','Militar','Noble','Sabio','Siervo'];
+    const ALIGNMENTS = ['lawful_good','neutral_good','chaotic_good','lawful_neutral','true_neutral','chaotic_neutral','lawful_evil','neutral_evil','chaotic_evil'];
+    const ALIGNMENT_LABELS = {
+      lawful_good:'Legal Bueno', neutral_good:'Neutral Bueno', chaotic_good:'Caótico Bueno',
+      lawful_neutral:'Legal Neutral', true_neutral:'Neutral', chaotic_neutral:'Caótico Neutral',
+      lawful_evil:'Legal Malvado', neutral_evil:'Neutral Malvado', chaotic_evil:'Caótico Malvado',
+    };
     const campOptions = [
-      { value: '', label: '— Ninguna —' },
+      { value: '', label: '— Sin campaña —' },
       ...campaigns.map(c => ({ value: c.id, label: c.name })),
     ];
 
-    form.appendChild(row('Nombre *', input('f-name', 'Aragorn el Montaraz')));
+    const e = existing ?? {};
 
-    const twoCol = document.createElement('div');
-    twoCol.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:12px;';
-    twoCol.appendChild(row('Raza', select('f-race', RACES)));
-    twoCol.appendChild(row('Clase', select('f-class', CLASSES)));
-    form.appendChild(twoCol);
+    /* ── SECCIÓN: Identidad ── */
+    form.appendChild(sectionHeader('Identidad'));
+    form.appendChild(fRow('Nombre *', fInput('f-name', 'Aragorn el Montaraz', e.name ?? '')));
+    form.appendChild(twoCol(
+      fRow('Raza', fSelect('f-race', [''].concat(RACES), e.race ?? '')),
+      fRow('Subraza', fInput('f-subrace', 'Ej. Alto Elfo', e.subrace ?? '')),
+    ));
+    form.appendChild(twoCol(
+      fRow('Clase', fSelect('f-class', [''].concat(CLASSES), e.char_class ?? '')),
+      fRow('Subclase', fInput('f-subclass', 'Ej. Campeón', e.subclass ?? '')),
+    ));
+    form.appendChild(twoCol(
+      fRow('Trasfondo', fSelect('f-background', [''].concat(BACKGROUNDS), e.background ?? '')),
+      fRow('Alineamiento', fSelect('f-alignment', [{ value:'', label:'—' }, ...ALIGNMENTS.map(a => ({ value: a, label: ALIGNMENT_LABELS[a] }))], e.alignment ?? '')),
+    ));
+    form.appendChild(twoCol(
+      fRow('Deidad / Patrón', fInput('f-deity', 'Ej. Bahamut', e.deity ?? '')),
+      fRow('Nivel', fNum('f-level', e.level ?? 1, 1, 20)),
+    ));
+    form.appendChild(fRow('Campaña', fSelect('f-campaign', campOptions, e.campaign_id ?? '')));
+    form.appendChild(fRow('URL Avatar / Retrato', fInput('f-portrait', 'https://...', e.portrait_url ?? '')));
 
-    const twoCol2 = document.createElement('div');
-    twoCol2.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:12px;';
-    twoCol2.appendChild(row('HP Máx *', numInput('f-maxhp', 10, 1, 999)));
-    twoCol2.appendChild(row('Nivel', numInput('f-level', 1, 1, 20)));
-    form.appendChild(twoCol2);
+    /* ── SECCIÓN: Estadísticas de combate ── */
+    form.appendChild(sectionHeader('Combate'));
+    form.appendChild(twoCol(
+      fRow('HP Actual', fNum('f-hp', e.hp ?? 8, 0, 999)),
+      fRow('HP Máximo *', fNum('f-maxhp', e.max_hp ?? 8, 1, 999)),
+    ));
+    form.appendChild(twoCol(
+      fRow('Temp. HP', fNum('f-temphp', e.temp_hp ?? 0, 0, 999)),
+      fRow('CA', fNum('f-ac', e.ac ?? 10, 0, 30)),
+    ));
+    form.appendChild(twoCol(
+      fRow('Velocidad (ft)', fNum('f-speed', e.speed ?? 30, 0, 120)),
+      fRow('Bonus Iniciativa', fNum('f-init', e.initiative_bonus ?? 0, -10, 20)),
+    ));
+    form.appendChild(twoCol(
+      fRow('Bonus Competencia', fNum('f-prof', e.prof_bonus ?? 2, 1, 9)),
+      fRow('Percepción Pasiva', fNum('f-pp', e.passive_perception ?? 10, 1, 30)),
+    ));
 
-    const twoCol3 = document.createElement('div');
-    twoCol3.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:12px;';
-    twoCol3.appendChild(row('CA', numInput('f-ac', 10, 0, 30)));
-    twoCol3.appendChild(row('Velocidad (ft)', numInput('f-speed', 30, 0, 120)));
-    form.appendChild(twoCol3);
-
-    form.appendChild(row('Campaña', select('f-campaign', campOptions)));
-
-    const statsLabel = document.createElement('div');
-    statsLabel.style.cssText = 'font-size:11px;font-weight:600;color:var(--ink-muted);letter-spacing:0.06em;text-transform:uppercase;margin-top:4px;';
-    statsLabel.textContent = 'Puntuaciones (Ability Scores)';
-    form.appendChild(statsLabel);
+    /* ── SECCIÓN: Puntuaciones de Característica ── */
+    form.appendChild(sectionHeader('Puntuaciones de Característica'));
+    const statsGrid = document.createElement('div');
+    statsGrid.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:12px;';
+    [
+      { id:'f-str', label:'Fuerza',       key:'str_score' },
+      { id:'f-dex', label:'Destreza',     key:'dex_score' },
+      { id:'f-con', label:'Constitución', key:'con_score' },
+      { id:'f-int', label:'Inteligencia', key:'int_score' },
+      { id:'f-wis', label:'Sabiduría',    key:'wis_score' },
+      { id:'f-cha', label:'Carisma',      key:'cha_score' },
+    ].forEach(sf => {
+      statsGrid.appendChild(fRow(sf.label, fNum(sf.id, e[sf.key] ?? 10, 1, 30)));
+    });
     form.appendChild(statsGrid);
 
-    /* Buttons */
+    /* ── SECCIÓN: Personalidad ── */
+    form.appendChild(sectionHeader('Personalidad & Historia'));
+    form.appendChild(fRow('Rasgos de Personalidad', fTextarea('f-traits', 'Soy curioso y siempre hago preguntas…', e.personality_traits ?? '')));
+    form.appendChild(twoCol(
+      fRow('Ideales', fTextarea('f-ideals', 'La justicia es el bien supremo.', e.ideals ?? '', 2)),
+      fRow('Vínculos', fTextarea('f-bonds', 'Protejo a mi aldea natal.', e.bonds ?? '', 2)),
+    ));
+    form.appendChild(fRow('Defectos', fTextarea('f-flaws', 'No puedo resistir un acertijo.', e.flaws ?? '', 2)));
+    form.appendChild(fRow('Historia del Personaje', fTextarea('f-backstory', 'Nació en una pequeña aldea…', e.backstory ?? '', 4)));
+    form.appendChild(fRow('Notas', fTextarea('f-notes', 'Detalles adicionales…', e.notes ?? '', 3)));
+
+    /* ── Buttons ── */
     const btnRow = document.createElement('div');
     btnRow.style.cssText = 'display:flex;gap:12px;margin-top:8px;';
 
@@ -938,44 +1045,66 @@ export async function render(container) {
     const saveBtn = document.createElement('button');
     saveBtn.className = 'btn btn-primary';
     saveBtn.style.cssText = 'flex:2;';
-    saveBtn.textContent = 'Crear personaje';
+    saveBtn.textContent = isEdit ? 'Guardar cambios' : 'Crear personaje';
 
     saveBtn.addEventListener('click', async () => {
-      const name  = form.querySelector('#f-name').value.trim();
-      const maxhp = parseInt(form.querySelector('#f-maxhp').value) || 10;
+      const name   = form.querySelector('#f-name').value.trim();
+      const maxhp  = parseInt(form.querySelector('#f-maxhp').value) || 1;
       const campId = form.querySelector('#f-campaign').value;
 
       if (!name) { toast.error('Campo requerido', 'El nombre es obligatorio'); return; }
-      if (!campId) { toast.error('Campo requerido', 'Selecciona una campaña'); return; }
+      if (!isEdit && !campId) { toast.error('Campo requerido', 'Selecciona una campaña'); return; }
 
       saveBtn.disabled = true;
-      saveBtn.textContent = 'Creando...';
+      saveBtn.textContent = isEdit ? 'Guardando...' : 'Creando...';
+
+      const payload = {
+        name,
+        race:               form.querySelector('#f-race').value || null,
+        subrace:            form.querySelector('#f-subrace').value || null,
+        char_class:         form.querySelector('#f-class').value || null,
+        subclass:           form.querySelector('#f-subclass').value || null,
+        background:         form.querySelector('#f-background').value || null,
+        alignment:          form.querySelector('#f-alignment').value || null,
+        deity:              form.querySelector('#f-deity').value || null,
+        level:              parseInt(form.querySelector('#f-level').value) || 1,
+        hp:                 parseInt(form.querySelector('#f-hp').value) || maxhp,
+        max_hp:             maxhp,
+        temp_hp:            parseInt(form.querySelector('#f-temphp').value) || 0,
+        ac:                 parseInt(form.querySelector('#f-ac').value) || 10,
+        speed:              parseInt(form.querySelector('#f-speed').value) || 30,
+        initiative_bonus:   parseInt(form.querySelector('#f-init').value) || 0,
+        prof_bonus:         parseInt(form.querySelector('#f-prof').value) || 2,
+        passive_perception: parseInt(form.querySelector('#f-pp').value) || 10,
+        str_score:          parseInt(form.querySelector('#f-str').value) || 10,
+        dex_score:          parseInt(form.querySelector('#f-dex').value) || 10,
+        con_score:          parseInt(form.querySelector('#f-con').value) || 10,
+        int_score:          parseInt(form.querySelector('#f-int').value) || 10,
+        wis_score:          parseInt(form.querySelector('#f-wis').value) || 10,
+        cha_score:          parseInt(form.querySelector('#f-cha').value) || 10,
+        portrait_url:       form.querySelector('#f-portrait').value || null,
+        personality_traits: form.querySelector('#f-traits').value || null,
+        ideals:             form.querySelector('#f-ideals').value || null,
+        bonds:              form.querySelector('#f-bonds').value || null,
+        flaws:              form.querySelector('#f-flaws').value || null,
+        backstory:          form.querySelector('#f-backstory').value || null,
+        notes:              form.querySelector('#f-notes').value || null,
+      };
 
       try {
-        await api.post('/characters', {
-          name,
-          race:         form.querySelector('#f-race').value,
-          char_class:   form.querySelector('#f-class').value,
-          level:        parseInt(form.querySelector('#f-level').value) || 1,
-          hp:           maxhp,
-          max_hp:       maxhp,
-          ac:           parseInt(form.querySelector('#f-ac').value) || 10,
-          speed:        parseInt(form.querySelector('#f-speed').value) || 30,
-          campaign_id:  campId,
-          str_score:    parseInt(form.querySelector('#f-str').value) || 10,
-          dex_score:    parseInt(form.querySelector('#f-dex').value) || 10,
-          con_score:    parseInt(form.querySelector('#f-con').value) || 10,
-          int_score:    parseInt(form.querySelector('#f-int').value) || 10,
-          wis_score:    parseInt(form.querySelector('#f-wis').value) || 10,
-          cha_score:    parseInt(form.querySelector('#f-cha').value) || 10,
-        });
-        toast.success('¡Personaje creado!', name);
+        if (isEdit) {
+          await api.put(`/characters/${existing.id}`, payload);
+          toast.success('Personaje actualizado', name);
+        } else {
+          await api.post('/characters', { ...payload, campaign_id: campId });
+          toast.success('¡Personaje creado!', name);
+        }
         overlay.remove();
         loadCharacters();
       } catch (err) {
         toast.error('Error', err.message);
         saveBtn.disabled = false;
-        saveBtn.textContent = 'Crear personaje';
+        saveBtn.textContent = isEdit ? 'Guardar cambios' : 'Crear personaje';
       }
     });
 
@@ -993,5 +1122,5 @@ export async function render(container) {
     });
 
     setTimeout(() => form.querySelector('#f-name').focus(), 100);
-}
+  }
 }
