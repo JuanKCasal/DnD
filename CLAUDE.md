@@ -102,7 +102,7 @@ DnD/
 │   └── service.key
 │
 ├── frontend/                      ← SPA → GitHub Pages
-│   ├── index.html                 # Cache-bust: v=20260629
+│   ├── index.html                 # Cache-bust: v=20260630
 │   ├── css/
 │   │   ├── main.css               # Design system + tokens (light theme)
 │   │   ├── animations.css         # Keyframes y transiciones
@@ -119,9 +119,9 @@ DnD/
 │       ├── login.js
 │       ├── dashboard.js
 │       ├── campaigns.js
-│       ├── characters.js          # Ficha completa D&D 5e + edit/delete cards
+│       ├── characters.js          # Ficha completa D&D 5e + edit/delete + modal 5 tabs + inventario inline (~1843 líneas)
 │       ├── sessions.js
-│       ├── inventory.js
+│       ├── inventory.js           # Modo player/treasury/catalogue detectado por hash
 │       └── members.js
 │
 ├── api/                           ← FastAPI → Railway
@@ -242,12 +242,17 @@ La app debe sentirse como un **artefacto del mundo de D&D digitalizado**: pergam
 Estructura del mega-menu (en `router.js`, constante `NAV_GROUPS`):
 
 - **Noticias** *(deshabilitado)*
-- **Dashboard**
-- **Mi DnD:** Personajes, Inventario | Perfil *(deshabilitado)*
-- **Juego:** Campañas, Sesiones | Misiones *(deshabilitado)*
+- **Dashboard** → `#/dashboard`
+- **Mi DnD:** Personajes `#/characters`, Inventario del Jugador `#/inventory` | Perfil *(deshabilitado)*
+- **Juego:** Campañas `#/campaigns`, Sesiones `#/sessions`, Tesoros `#/treasury` | Misiones *(deshabilitado)*
 - **Mundo:** Clanes, Salón de la Fama *(deshabilitados)*
 - **Comunidad:** Chat, Calendario & Eventos *(deshabilitados)*
-- **Configuración:** Miembros | Event Log *(deshabilitado)*
+- **Configuración:** Miembros `#/members`, Catálogo `#/catalogue` | Event Log *(deshabilitado)*
+
+**Rutas de inventario — todas usan `inventory.js`, modo por hash:**
+- `#/inventory` → modo `player` — equipamiento del jugador entre personajes
+- `#/treasury` → modo `treasury` — tesoros y monedas por campaña (admin/DM)
+- `#/catalogue` → modo `catalogue` — catálogo de items de la comunidad (admin only)
 
 Items deshabilitados: badge "Próximamente", `cursor:not-allowed`, no clickeables.
 `max-width: 1300px` global en nav, main-content y todas las páginas.
@@ -489,21 +494,44 @@ async def get_producer(settings):
 
 ### Fase 7 — Personajes: Mejoras completas ✅ COMPLETADA
 
+#### Modal + Ficha
 - [x] **6 ability scores en cards** — list SQL incluye `c.str AS str_score`...`c.cha AS cha_score`
 - [x] **Edit/delete en cards** — botones hover (visibles para admin, dm y dueño del personaje)
-- [x] **Modal unificado create/edit** — `openCharacterModal(existing|null)` con secciones completas:
-  - Identidad: name, race, subrace, class, subclass, background, alignment, deity, level, campaign, portrait_url
-  - Combate: hp, max_hp, temp_hp, ac, speed, initiative_bonus, prof_bonus, passive_perception
-  - Puntuaciones (grid 3 col): str, dex, con, int, wis, cha
-  - Personalidad & Historia: personality_traits, ideals, bonds, flaws, backstory, notes
+- [x] **Modal unificado create/edit** (`openCharacterModal`) — 5 tabs: General · Habilidades · Hechizos · Rasgos · 🎒 Inventario
+  - General: Identidad (raza, subraza dinámica, clase, trasfondo, alineamiento, deidad, nivel, campaña, retrato), Combate (HP, CA, velocidad, etc.), Puntuaciones 3-col, Personalidad & Historia
+  - Habilidades: tiradas de salvación (determinísticas por clase PHB §10) + 18 habilidades con competencias (trasfondo locked, raza locked, clase con checkboxes limitados)
+  - Rasgos: personalidad, ideales, vínculos, defectos, trasfondo, notas, dotes
+  - 🎒 Inventario: lazy-loaded al primer click, lista de items con equip/desequip + quitar, botón "Añadir item" con modal de búsqueda en catálogo
 - [x] **DELETE endpoint** — soft-delete (`active = FALSE`) con verificación de dueño
-- [x] **CharacterOut** incluye todos los campos (notes, personalidad, portrait_url, inspiration, xp, spell_slots, conditions, feats, saving_throws, skills, created_at)
+- [x] **CharacterOut** incluye todos los campos
+
+#### PHB Competencias (implementadas en Fase 7)
+- [x] **Tiradas de salvación** — `CLASS_SAVES_KEYS` en `characters.js` mapea clase → 2 saves; se refleja en círculos del tab Habilidades y se guarda en `saving_throws` JSONB
+- [x] **18 habilidades** — `BACKGROUND_SKILLS`, `RACE_SKILLS`, `CLASS_SKILLS` (con conteo y lista de opciones por clase PHB); trasfondo y raza como badges 🔒 gold, clase como checkboxes reactivos
+- [x] **Skill payload** — `lockedSkillKeys` (trasfondo + raza) + checkboxes de clase → `skills` JSONB al guardar
+
+#### Módulos de constantes (al inicio de `characters.js`, scope de módulo)
+```javascript
+CLASS_SAVES_KEYS   // clase → [k1, k2] (PHB)
+RACE_SKILLS        // raza → [skill_key, ...]
+SKILL_NAME_TO_KEY  // 'Acrobacias' → 'acrobatics'
+SKILL_KEY_TO_NAME  // inverso
+CLASS_SKILLS       // clase → { count, options[] }
+RACE_DATA          // raza → { bonuses, speed, subraces, special }
+BACKGROUND_SKILLS  // trasfondo → [skill_name, skill_name]
+CLASS_SAVES        // clase → ['STR','CON'] (display label)
+```
+
+#### Reestructura de Inventario (también en Fase 7)
+- [x] **`inventory.js` — modo por hash** — detecta `#/inventory` / `#/treasury` / `#/catalogue` y renderiza la vista correcta
+- [x] **Nav actualizada** — Inventario del Jugador bajo Mi DnD, Tesoros bajo Juego, Catálogo bajo Configuración
+- [x] **Tab Inventario en ficha** — `renderShInventario(el)` lazy-load: carga `GET /characters/{id}/inventory`, items con equip toggle y quitar; `openInvAddModal` busca en catálogo y POST al inventario
 
 **⚠️ COMMIT PENDIENTE — ejecutar desde PowerShell:**
 ```powershell
 cd C:\Users\casal\Claude\DnD
-git add api/routers/characters.py frontend/css/animations.css
-git commit -m "feat: personajes — SQL con 6 stats, DELETE endpoint, notas"
+git add frontend/pages/characters.js frontend/js/router.js frontend/pages/inventory.js
+git commit -m "feat: PHB competencias + tab inventario en ficha + reestructura rutas inventario"
 git push origin main
 ```
 
