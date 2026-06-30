@@ -14,28 +14,71 @@ const STAT_LABELS = {
   int_score: 'INT', wis_score: 'SAB', cha_score: 'CAR',
 };
 
-/* ─── D&D 5e SRD RACIAL BONUSES (2014) ──────────────────────────────── */
-const RACIAL_BONUSES = {
-  'Humano':    { str:1, dex:1, con:1, int:1, wis:1, cha:1 },
-  'Elfo':      { dex:2 },
-  'Enano':     { con:2 },
-  'Mediano':   { dex:2 },
-  'Gnomo':     { int:2 },
-  'Semielfo':  { cha:2 },
-  'Semiorco':  { str:2, con:1 },
-  'Tiefling':  { int:1, cha:2 },
-  'Dracónido': { str:2, cha:1 },
-  'Aasimar':   { wis:1, cha:2 },
-  'Genasi':    {},
+/* ─── D&D 5e SRD RACE DATA (2014) — Razas con subrazas, bonos y velocidad ── */
+const RACE_DATA = {
+  'Humano':    { speed:30, bonuses:{ str:1,dex:1,con:1,int:1,wis:1,cha:1 }, subraces:null },
+  'Elfo':      { speed:30, bonuses:{}, subraces:{
+    'Alto':          { bonuses:{ dex:2,int:1 }, speed:30 },
+    'Del Bosque':    { bonuses:{ dex:2,wis:1 }, speed:35 },
+    'Oscuro (Drow)': { bonuses:{ dex:2,cha:1 }, speed:30 },
+  }},
+  'Enano':     { speed:25, bonuses:{}, subraces:{
+    'De las Colinas':  { bonuses:{ con:2,wis:1 } },
+    'De las Montañas': { bonuses:{ con:2,str:2 } },
+  }},
+  'Mediano':   { speed:25, bonuses:{}, subraces:{
+    'Pie Ligero': { bonuses:{ dex:2,cha:1 } },
+    'Fornido':    { bonuses:{ dex:2,con:1 } },
+  }},
+  'Gnomo':     { speed:25, bonuses:{}, subraces:{
+    'De las Rocas': { bonuses:{ int:2,con:1 } },
+    'Del Bosque':   { bonuses:{ int:2,dex:1 } },
+  }},
+  'Semielfo':  { speed:30, bonuses:{ cha:2 }, subraces:null, special:'choice2' },
+  'Semiorco':  { speed:30, bonuses:{ str:2,con:1 }, subraces:null },
+  'Tiefling':  { speed:30, bonuses:{ int:1,cha:2 }, subraces:null },
+  'Dracónido': { speed:30, bonuses:{ str:2,cha:1 }, subraces:null },
+  'Aasimar':   { speed:30, bonuses:{ wis:1,cha:2 }, subraces:null },
+  'Genasi':    { speed:30, bonuses:{}, subraces:{
+    'De Fuego': { bonuses:{ con:2,int:1 } },
+    'De Agua':  { bonuses:{ con:2,wis:1 } },
+    'De Tierra':{ bonuses:{ con:2,str:1 } },
+    'De Aire':  { bonuses:{ con:2,dex:1 } },
+  }},
 };
 
-/* ─── D&D 5e HIT DICE POR CLASE ─────────────────────────────────────── */
+/* ─── Competencias de habilidad por Trasfondo (PHB) ─────────────────── */
+const BACKGROUND_SKILLS = {
+  'Acólito':          ['Perspicacia','Religión'],
+  'Artesano Gremial': ['Perspicacia','Persuasión'],
+  'Criminal':         ['Engaño','Sigilo'],
+  'Ermitaño':         ['Medicina','Religión'],
+  'Forajido':         ['Atletismo','Supervivencia'],
+  'Héroe Popular':    ['Trato con Animales','Supervivencia'],
+  'Marinero':         ['Atletismo','Percepción'],
+  'Mercader':         ['Perspicacia','Persuasión'],
+  'Militar':          ['Atletismo','Intimidación'],
+  'Noble':            ['Historia','Persuasión'],
+  'Sabio':            ['Arcanos','Historia'],
+  'Siervo':           ['Historia','Perspicacia'],
+};
+
+/* ─── Tiradas de salvación con competencia por Clase (PHB) ──────────── */
+const CLASS_SAVES = {
+  'Bárbaro':['FUE','CON'],'Bardo':['DES','CAR'],'Clérigo':['SAB','CAR'],
+  'Druida':['INT','SAB'],'Guerrero':['FUE','CON'],'Monje':['FUE','DES'],
+  'Paladín':['SAB','CAR'],'Explorador':['FUE','DES'],'Pícaro':['DES','INT'],
+  'Hechicero':['CON','CAR'],'Brujo':['SAB','CAR'],'Mago':['INT','SAB'],
+};
+
+/* ─── Dado de golpe por Clase ────────────────────────────────────────── */
 const CLASS_HIT_DIE = {
   'Bárbaro':12,'Bardo':8,'Brujo':8,'Clérigo':8,'Druida':8,
   'Explorador':10,'Guerrero':10,'Hechicero':6,'Mago':6,'Monje':8,'Paladín':10,'Pícaro':8,
 };
 
-function profBonusByLevel(lvl) { return Math.ceil(lvl / 4) + 1; }
+/* BPC = floor((nivel-1)/4) + 2  →  +2(N1-4), +3(N5-8), +4(N9-12), +5(N13-16), +6(N17-20) */
+function profBonusByLevel(lvl) { return Math.floor((lvl - 1) / 4) + 2; }
 
 /* ─── MAIN RENDER ───────────────────────────────────────────────── */
 export async function render(container) {
@@ -991,16 +1034,65 @@ export async function render(container) {
     /* ── SECCIÓN: Identidad ── */
     form.appendChild(sectionHeader('Identidad'));
     form.appendChild(fRow('Nombre *', fInput('f-name', 'Aragorn el Montaraz', e.name ?? '')));
+    // Subraza — select dinámico: opciones cambian según la raza elegida
+    const subraceEl = document.createElement('select');
+    subraceEl.id = 'f-subrace'; subraceEl.className = 'input';
+    const updateSubraceOptions = (race, sel = '') => {
+      subraceEl.innerHTML = '<option value="">— Sin subraza —</option>';
+      const sr = RACE_DATA[race]?.subraces;
+      if (sr) {
+        Object.keys(sr).forEach(k => {
+          const o = document.createElement('option');
+          o.value = k; o.textContent = k; if (k === sel) o.selected = true;
+          subraceEl.appendChild(o);
+        });
+        subraceEl.disabled = false;
+      } else {
+        subraceEl.disabled = true;
+      }
+    };
+    updateSubraceOptions(e.race ?? '', e.subrace ?? '');
+
     form.appendChild(twoCol(
       fRow('Raza', fSelect('f-race', [''].concat(RACES), e.race ?? '')),
-      fRow('Subraza', fInput('f-subrace', 'Ej. Alto Elfo', e.subrace ?? '')),
+      fRow('Subraza', subraceEl),
     ));
+    // Clase con badge de salvaciones
+    const clsSelect = fSelect('f-class', [''].concat(CLASSES), e.char_class ?? '');
+    const clsSaves  = document.createElement('div');
+    clsSaves.id = 'f-class-saves';
+    clsSaves.style.cssText = 'font-size:10px;color:var(--gold-dim);margin-top:4px;min-height:14px;font-style:italic;';
+    const initSaves = CLASS_SAVES[e.char_class ?? ''];
+    clsSaves.textContent = initSaves ? '🛡 Salvaciones: ' + initSaves.join(' + ') : '';
+    const clsWrap = document.createElement('div');
+    clsWrap.appendChild(clsSelect); clsWrap.appendChild(clsSaves);
+
     form.appendChild(twoCol(
-      fRow('Clase', fSelect('f-class', [''].concat(CLASSES), e.char_class ?? '')),
+      fRow('Clase', clsWrap),
       fRow('Subclase', fInput('f-subclass', 'Ej. Campeón', e.subclass ?? '')),
     ));
+
+    // Hint Semielfo: +1 a 2 características a elección (no automático)
+    const semielfoHint = document.createElement('div');
+    semielfoHint.id = 'f-semielfo-hint';
+    semielfoHint.style.cssText = 'font-size:11px;color:var(--gold);background:rgba(122,92,10,0.08);border:1px solid var(--gold-glow);border-radius:6px;padding:8px 12px;display:none;';
+    semielfoHint.innerHTML = '✨ <b>Semielfo:</b> Además del +2 CAR, elige 2 características distintas y añade +1 a cada una manualmente en los campos de abajo.';
+    form.appendChild(semielfoHint);
+    // Trasfondo con badge de competencias
+    const bgSelect = fSelect('f-background', [''].concat(BACKGROUNDS), e.background ?? '');
+    const bgBadge  = document.createElement('div');
+    bgBadge.style.cssText = 'font-size:10px;color:var(--gold-dim);margin-top:4px;min-height:14px;font-style:italic;letter-spacing:0.02em;';
+    const updateBgBadge = bg => {
+      const sk = BACKGROUND_SKILLS[bg];
+      bgBadge.textContent = sk ? '⚔ Competencias: ' + sk.join(' · ') : '';
+    };
+    updateBgBadge(e.background ?? '');
+    bgSelect.addEventListener('change', ev => updateBgBadge(ev.target.value));
+    const bgWrap = document.createElement('div');
+    bgWrap.appendChild(bgSelect); bgWrap.appendChild(bgBadge);
+
     form.appendChild(twoCol(
-      fRow('Trasfondo', fSelect('f-background', [''].concat(BACKGROUNDS), e.background ?? '')),
+      fRow('Trasfondo', bgWrap),
       fRow('Alineamiento', fSelect('f-alignment', [{ value:'', label:'—' }, ...ALIGNMENTS.map(a => ({ value: a, label: ALIGNMENT_LABELS[a] }))], e.alignment ?? '')),
     ));
     form.appendChild(twoCol(
@@ -1031,10 +1123,60 @@ export async function render(container) {
 
     /* ── SECCIÓN: Puntuaciones de Característica ── */
     form.appendChild(sectionHeader('Puntuaciones de Característica'));
-    const arrayHint = document.createElement('div');
-    arrayHint.style.cssText = 'font-size:11px;color:var(--ink-muted);background:var(--stone-light);border:1px solid var(--border);border-radius:6px;padding:8px 12px;';
-    arrayHint.innerHTML = '🎲 <b>Array estándar:</b> 15, 14, 13, 12, 10, 8 · Al elegir raza los valores base se ajustan automáticamente.';
-    form.appendChild(arrayHint);
+
+    // Barra de métodos SRD
+    const methodRow = document.createElement('div');
+    methodRow.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;align-items:center;';
+    const methodLbl = document.createElement('span');
+    methodLbl.style.cssText = 'font-size:10px;color:var(--ink-muted);text-transform:uppercase;letter-spacing:0.06em;flex-shrink:0;';
+    methodLbl.textContent = 'Método:';
+    methodRow.appendChild(methodLbl);
+
+    const STANDARD_ARRAY = [15,14,13,12,10,8];
+    const POINT_BUY_COST = { 8:0,9:1,10:2,11:3,12:4,13:5,14:7,15:9 };
+
+    const applyStatValues = baseVals => {
+      const rdata  = RACE_DATA[form.querySelector('#f-race').value];
+      const srdata = rdata?.subraces?.[form.querySelector('#f-subrace').value];
+      const bonuses = { ...(rdata?.bonuses ?? {}), ...(srdata?.bonuses ?? {}) };
+      STAT_DEFS.forEach((sf, i) => {
+        const total = Math.min(30, Math.max(1, baseVals[i] + (bonuses[sf.bk] ?? 0)));
+        form.querySelector('#' + sf.id).value = total;
+        const badge = form.querySelector('#' + sf.id + '-mod');
+        if (badge) badge.textContent = modStr(total);
+      });
+      recalcDerived();
+    };
+
+    [
+      {
+        label: 'Array Estándar',
+        title: 'Rellena con 15/14/13/12/10/8 en orden FUE·DES·CON·INT·SAB·CAR. Redistribuye a mano según tu concepto.',
+        action: () => applyStatValues([...STANDARD_ARRAY]),
+      },
+      {
+        label: '🎲 Tirar Dados',
+        title: 'Simula 4d6 descartando el dado más bajo para cada característica (método clásico).',
+        action: () => applyStatValues(STAT_DEFS.map(() => {
+          const d = Array.from({length:4}, () => 1 + Math.floor(Math.random() * 6)).sort((a,b) => a-b);
+          return d[1] + d[2] + d[3];
+        })),
+      },
+    ].forEach(({ label, title, action }) => {
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'btn'; btn.title = title;
+      btn.style.cssText = 'font-size:11px;padding:5px 10px;';
+      btn.textContent = label;
+      btn.addEventListener('click', action);
+      methodRow.appendChild(btn);
+    });
+    form.appendChild(methodRow);
+
+    // Counter de Point Buy (se actualiza en recalcDerived)
+    const pbCounter = document.createElement('div');
+    pbCounter.id = 'f-pb-counter';
+    pbCounter.style.cssText = 'font-size:10px;color:var(--ink-muted);text-align:right;min-height:14px;transition:color 150ms;';
+    form.appendChild(pbCounter);
     const statsGrid = document.createElement('div');
     statsGrid.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:12px;';
     const STAT_DEFS = [
@@ -1075,24 +1217,20 @@ export async function render(container) {
     form.appendChild(fRow('Historia del Personaje', fTextarea('f-backstory', 'Nació en una pequeña aldea…', e.backstory ?? '', 4)));
     form.appendChild(fRow('Notas', fTextarea('f-notes', 'Detalles adicionales…', e.notes ?? '', 3)));
 
-    /* ── Lógica reactiva D&D 5e ── */
+    /* ── Lógica reactiva D&D 5e ─────────────────────────────────────── */
+
     function recalcDerived() {
       const dex   = parseInt(form.querySelector('#f-dex').value) || 10;
       const con   = parseInt(form.querySelector('#f-con').value) || 10;
       const wis   = parseInt(form.querySelector('#f-wis').value) || 10;
       const level = parseInt(form.querySelector('#f-level').value) || 1;
       const cls   = form.querySelector('#f-class').value;
+      const prof  = profBonusByLevel(level);
 
-      // Bonus de competencia por nivel (tabla fija SRD)
-      form.querySelector('#f-prof').value = profBonusByLevel(level);
-
-      // Iniciativa = modificador de DES
+      form.querySelector('#f-prof').value = prof;
       form.querySelector('#f-init').value = modifier(dex);
+      form.querySelector('#f-pp').value   = 10 + modifier(wis);
 
-      // Percepción pasiva = 10 + mod SAB
-      form.querySelector('#f-pp').value = 10 + modifier(wis);
-
-      // HP máximo: nivel 1 → dado max + mod CON; niveles siguientes → promedio + mod CON
       if (cls && CLASS_HIT_DIE[cls]) {
         const die    = CLASS_HIT_DIE[cls];
         const conMod = modifier(con);
@@ -1101,30 +1239,76 @@ export async function render(container) {
         form.querySelector('#f-maxhp').value = maxHp;
         if (!isEdit) form.querySelector('#f-hp').value = maxHp;
       }
+
+      const savesEl = form.querySelector('#f-class-saves');
+      if (savesEl) {
+        const saves = CLASS_SAVES[cls];
+        savesEl.textContent = saves ? '🛡 Salvaciones: ' + saves.join(' + ') : '';
+      }
+
+      const pbEl = form.querySelector('#f-pb-counter');
+      if (pbEl) {
+        let pts = 0; let outRange = false;
+        STAT_DEFS.forEach(sf => {
+          const v = parseInt(form.querySelector('#' + sf.id).value) || 10;
+          if (v < 8 || v > 15) outRange = true;
+          pts += POINT_BUY_COST[v] ?? 0;
+        });
+        if (outRange) {
+          pbEl.style.color = 'var(--ink-faint)';
+          pbEl.textContent = 'Point Buy: valores fuera del rango permitido (8–15)';
+        } else {
+          const rem = 27 - pts;
+          pbEl.style.color = rem < 0 ? 'var(--crimson)' : rem === 0 ? 'var(--success)' : 'var(--ink-muted)';
+          pbEl.textContent = `Point Buy: ${pts}/27 pts · ${rem >= 0 ? rem + ' restantes' : Math.abs(rem) + ' sobre el límite'}`;
+        }
+      }
     }
 
-    function applyRacialBonuses(race) {
-      const bonuses = RACIAL_BONUSES[race] ?? {};
+    function applyRaceBonuses() {
+      const race    = form.querySelector('#f-race').value;
+      const subrace = form.querySelector('#f-subrace').value;
+      const rdata   = RACE_DATA[race];
+      const srdata  = rdata?.subraces?.[subrace];
+      const bonuses = { ...(rdata?.bonuses ?? {}), ...(srdata?.bonuses ?? {}) };
+      const speed   = srdata?.speed ?? rdata?.speed ?? 30;
+
       const BASE = { str:10, dex:10, con:10, int:10, wis:10, cha:10 };
       STAT_DEFS.forEach(sf => {
         const val = BASE[sf.bk] + (bonuses[sf.bk] ?? 0);
-        const input = form.querySelector('#' + sf.id);
-        input.value = val;
+        form.querySelector('#' + sf.id).value = val;
         const badge = form.querySelector('#' + sf.id + '-mod');
         if (badge) badge.textContent = modStr(val);
       });
+
+      form.querySelector('#f-speed').value = speed;
+
+      const semiHint = form.querySelector('#f-semielfo-hint');
+      if (semiHint) semiHint.style.display = (rdata?.special === 'choice2') ? 'block' : 'none';
+
       recalcDerived();
     }
 
-    // Listeners reactivos
     form.querySelector('#f-race').addEventListener('change', ev => {
-      if (!isEdit) applyRacialBonuses(ev.target.value);
-      else recalcDerived();
+      updateSubraceOptions(ev.target.value, '');
+      if (!isEdit) applyRaceBonuses();
+      else {
+        form.querySelector('#f-speed').value = RACE_DATA[ev.target.value]?.speed ?? 30;
+        recalcDerived();
+      }
+    });
+    form.querySelector('#f-subrace').addEventListener('change', () => {
+      if (!isEdit) applyRaceBonuses();
+      else {
+        const rd  = RACE_DATA[form.querySelector('#f-race').value];
+        const srd = rd?.subraces?.[form.querySelector('#f-subrace').value];
+        form.querySelector('#f-speed').value = srd?.speed ?? rd?.speed ?? 30;
+        recalcDerived();
+      }
     });
     form.querySelector('#f-class').addEventListener('change', () => recalcDerived());
     form.querySelector('#f-level').addEventListener('input',  () => recalcDerived());
 
-    // Calcular derivados al abrir para personajes nuevos
     if (!isEdit) recalcDerived();
 
     /* ── Buttons ── */
@@ -1147,8 +1331,8 @@ export async function render(container) {
       const maxhp  = parseInt(form.querySelector('#f-maxhp').value) || 1;
       const campId = form.querySelector('#f-campaign').value;
 
-      if (!name) { toast.error('Campo requerido', 'El nombre es obligatorio'); return; }
-      if (!isEdit && !campId) { toast.error('Campo requerido', 'Selecciona una campaña'); return; }
+      if (!name)             { toast.error('Campo requerido', 'El nombre es obligatorio'); return; }
+      if (!isEdit && !campId){ toast.error('Campo requerido', 'Selecciona una campaña'); return; }
 
       saveBtn.disabled = true;
       saveBtn.textContent = isEdit ? 'Guardando...' : 'Creando...';
@@ -1192,7 +1376,7 @@ export async function render(container) {
           toast.success('Personaje actualizado', name);
         } else {
           await api.post('/characters', { ...payload, campaign_id: campId });
-          toast.success('¡Personaje creado!', name);
+          toast.success('Personaje creado', name);
         }
         overlay.remove();
         loadCharacters();
@@ -1205,12 +1389,12 @@ export async function render(container) {
 
     btnRow.appendChild(cancelBtn);
     btnRow.appendChild(saveBtn);
+
     modal.appendChild(modalTitle);
     modal.appendChild(form);
     modal.appendChild(btnRow);
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
-
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
     document.addEventListener('keydown', function esc(e) {
       if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
