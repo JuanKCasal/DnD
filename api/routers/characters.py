@@ -409,7 +409,7 @@ def _character_select() -> str:
            c.hp, c.max_hp, c.temp_hp, c.ac, c.initiative_bonus, c.speed,
            c.prof_bonus, c.passive_perception,
            c.spell_slots, c.conditions, c.feats, c.saving_throws, c.skills,
-           c.backstory, c.personality_traits, c.ideals, c.bonds, c.flaws,
+           c.backstory, c.personality_traits, c.ideals, c.bonds, c.flaws, c.notes,
            c.active, c.created_at
     FROM characters c
     """

@@ -14,6 +14,29 @@ const STAT_LABELS = {
   int_score: 'INT', wis_score: 'SAB', cha_score: 'CAR',
 };
 
+/* ─── D&D 5e SRD RACIAL BONUSES (2014) ──────────────────────────────── */
+const RACIAL_BONUSES = {
+  'Humano':    { str:1, dex:1, con:1, int:1, wis:1, cha:1 },
+  'Elfo':      { dex:2 },
+  'Enano':     { con:2 },
+  'Mediano':   { dex:2 },
+  'Gnomo':     { int:2 },
+  'Semielfo':  { cha:2 },
+  'Semiorco':  { str:2, con:1 },
+  'Tiefling':  { int:1, cha:2 },
+  'Dracónido': { str:2, cha:1 },
+  'Aasimar':   { wis:1, cha:2 },
+  'Genasi':    {},
+};
+
+/* ─── D&D 5e HIT DICE POR CLASE ─────────────────────────────────────── */
+const CLASS_HIT_DIE = {
+  'Bárbaro':12,'Bardo':8,'Brujo':8,'Clérigo':8,'Druida':8,
+  'Explorador':10,'Guerrero':10,'Hechicero':6,'Mago':6,'Monje':8,'Paladín':10,'Pícaro':8,
+};
+
+function profBonusByLevel(lvl) { return Math.ceil(lvl / 4) + 1; }
+
 /* ─── MAIN RENDER ───────────────────────────────────────────────── */
 export async function render(container) {
   container.innerHTML = '';
@@ -1008,17 +1031,36 @@ export async function render(container) {
 
     /* ── SECCIÓN: Puntuaciones de Característica ── */
     form.appendChild(sectionHeader('Puntuaciones de Característica'));
+    const arrayHint = document.createElement('div');
+    arrayHint.style.cssText = 'font-size:11px;color:var(--ink-muted);background:var(--stone-light);border:1px solid var(--border);border-radius:6px;padding:8px 12px;';
+    arrayHint.innerHTML = '🎲 <b>Array estándar:</b> 15, 14, 13, 12, 10, 8 · Al elegir raza los valores base se ajustan automáticamente.';
+    form.appendChild(arrayHint);
     const statsGrid = document.createElement('div');
     statsGrid.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:12px;';
-    [
-      { id:'f-str', label:'Fuerza',       key:'str_score' },
-      { id:'f-dex', label:'Destreza',     key:'dex_score' },
-      { id:'f-con', label:'Constitución', key:'con_score' },
-      { id:'f-int', label:'Inteligencia', key:'int_score' },
-      { id:'f-wis', label:'Sabiduría',    key:'wis_score' },
-      { id:'f-cha', label:'Carisma',      key:'cha_score' },
-    ].forEach(sf => {
-      statsGrid.appendChild(fRow(sf.label, fNum(sf.id, e[sf.key] ?? 10, 1, 30)));
+    const STAT_DEFS = [
+      { id:'f-str', label:'Fuerza',       key:'str_score', bk:'str' },
+      { id:'f-dex', label:'Destreza',     key:'dex_score', bk:'dex' },
+      { id:'f-con', label:'Constitución', key:'con_score', bk:'con' },
+      { id:'f-int', label:'Inteligencia', key:'int_score', bk:'int' },
+      { id:'f-wis', label:'Sabiduría',    key:'wis_score', bk:'wis' },
+      { id:'f-cha', label:'Carisma',      key:'cha_score', bk:'cha' },
+    ];
+    STAT_DEFS.forEach(sf => {
+      const inputRow = document.createElement('div');
+      inputRow.style.cssText = 'display:flex;align-items:center;gap:6px;';
+      const numInput = fNum(sf.id, e[sf.key] ?? 10, 1, 30);
+      numInput.style.flex = '1';
+      const modBadge = document.createElement('div');
+      modBadge.id = sf.id + '-mod';
+      modBadge.style.cssText = 'min-width:32px;text-align:center;font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--gold);background:var(--stone-light);border:1px solid var(--border);border-radius:6px;padding:6px 4px;flex-shrink:0;';
+      modBadge.textContent = modStr(e[sf.key] ?? 10);
+      numInput.addEventListener('input', () => {
+        modBadge.textContent = modStr(parseInt(numInput.value) || 10);
+        recalcDerived();
+      });
+      inputRow.appendChild(numInput);
+      inputRow.appendChild(modBadge);
+      statsGrid.appendChild(fRow(sf.label, inputRow));
     });
     form.appendChild(statsGrid);
 
@@ -1032,6 +1074,58 @@ export async function render(container) {
     form.appendChild(fRow('Defectos', fTextarea('f-flaws', 'No puedo resistir un acertijo.', e.flaws ?? '', 2)));
     form.appendChild(fRow('Historia del Personaje', fTextarea('f-backstory', 'Nació en una pequeña aldea…', e.backstory ?? '', 4)));
     form.appendChild(fRow('Notas', fTextarea('f-notes', 'Detalles adicionales…', e.notes ?? '', 3)));
+
+    /* ── Lógica reactiva D&D 5e ── */
+    function recalcDerived() {
+      const dex   = parseInt(form.querySelector('#f-dex').value) || 10;
+      const con   = parseInt(form.querySelector('#f-con').value) || 10;
+      const wis   = parseInt(form.querySelector('#f-wis').value) || 10;
+      const level = parseInt(form.querySelector('#f-level').value) || 1;
+      const cls   = form.querySelector('#f-class').value;
+
+      // Bonus de competencia por nivel (tabla fija SRD)
+      form.querySelector('#f-prof').value = profBonusByLevel(level);
+
+      // Iniciativa = modificador de DES
+      form.querySelector('#f-init').value = modifier(dex);
+
+      // Percepción pasiva = 10 + mod SAB
+      form.querySelector('#f-pp').value = 10 + modifier(wis);
+
+      // HP máximo: nivel 1 → dado max + mod CON; niveles siguientes → promedio + mod CON
+      if (cls && CLASS_HIT_DIE[cls]) {
+        const die    = CLASS_HIT_DIE[cls];
+        const conMod = modifier(con);
+        const avg    = Math.floor(die / 2) + 1;
+        const maxHp  = Math.max(1, die + conMod + (level - 1) * (avg + conMod));
+        form.querySelector('#f-maxhp').value = maxHp;
+        if (!isEdit) form.querySelector('#f-hp').value = maxHp;
+      }
+    }
+
+    function applyRacialBonuses(race) {
+      const bonuses = RACIAL_BONUSES[race] ?? {};
+      const BASE = { str:10, dex:10, con:10, int:10, wis:10, cha:10 };
+      STAT_DEFS.forEach(sf => {
+        const val = BASE[sf.bk] + (bonuses[sf.bk] ?? 0);
+        const input = form.querySelector('#' + sf.id);
+        input.value = val;
+        const badge = form.querySelector('#' + sf.id + '-mod');
+        if (badge) badge.textContent = modStr(val);
+      });
+      recalcDerived();
+    }
+
+    // Listeners reactivos
+    form.querySelector('#f-race').addEventListener('change', ev => {
+      if (!isEdit) applyRacialBonuses(ev.target.value);
+      else recalcDerived();
+    });
+    form.querySelector('#f-class').addEventListener('change', () => recalcDerived());
+    form.querySelector('#f-level').addEventListener('input',  () => recalcDerived());
+
+    // Calcular derivados al abrir para personajes nuevos
+    if (!isEdit) recalcDerived();
 
     /* ── Buttons ── */
     const btnRow = document.createElement('div');
