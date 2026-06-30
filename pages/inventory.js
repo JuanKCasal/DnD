@@ -25,7 +25,22 @@ const TYPE_ICON = {
 export async function render(container) {
   container.innerHTML = '';
   const user = auth.getUser();
-  const canManage = user?.role === 'admin' || user?.role === 'dm';
+
+  /* ── Detectar modo por ruta ── */
+  const hash = window.location.hash;
+  const mode = hash.startsWith('#/treasury') ? 'treasury'
+             : hash.startsWith('#/catalogue') ? 'catalogue'
+             : 'player';
+  const isAdmin = user?.role === 'admin';
+  const isDM    = user?.role === 'dm';
+  const canManage = mode === 'catalogue' ? isAdmin : isAdmin || isDM;
+
+  const PAGE_META = {
+    player:    { title: '᛭ Inventario del Jugador ᛭', subtitle: 'Equipamiento de tus personajes' },
+    treasury:  { title: '᛭ Tesoros de Campaña ᛭',     subtitle: 'Items y monedas del grupo' },
+    catalogue: { title: '᛭ Catálogo de Items ᛭',       subtitle: 'Todos los items de la comunidad' },
+  };
+  const meta = PAGE_META[mode];
 
   const page = document.createElement('div');
   page.className = 'page-inventory fade-in';
@@ -38,62 +53,22 @@ export async function render(container) {
   const titleBlock = document.createElement('div');
   const title = document.createElement('h2');
   title.style.cssText = 'font-family:var(--font-display);font-size:28px;color:var(--gold);margin:0 0 4px;';
-  title.textContent = '᛭ Inventario ᛭';
+  title.textContent = meta.title;
   const subtitle = document.createElement('p');
   subtitle.style.cssText = 'color:var(--ink-muted);font-size:14px;margin:0;';
-  subtitle.textContent = 'Equipamiento, tesoro y catálogo de items';
+  subtitle.textContent = meta.subtitle;
   titleBlock.appendChild(title);
   titleBlock.appendChild(subtitle);
   header.appendChild(titleBlock);
   page.appendChild(header);
 
-  /* ── Tabs ── */
-  const tabBar = document.createElement('div');
-  tabBar.style.cssText = 'display:flex;gap:4px;margin-bottom:24px;border-bottom:1px solid var(--border);';
-
-  const tabs = [
-    { id: 'character', label: '⚔️ Mi Inventario' },
-    { id: 'treasury',  label: '💰 Tesoro' },
-    { id: 'catalogue', label: '📦 Catálogo' },
-  ];
-
-  let activeTab = 'character';
   const content = document.createElement('div');
-
-  const tabEls = {};
-  tabs.forEach(t => {
-    const btn = document.createElement('button');
-    btn.style.cssText = `
-      padding:10px 20px;border:none;background:none;
-      font-family:var(--font-ui);font-size:13px;font-weight:500;
-      cursor:pointer;border-bottom:2px solid transparent;
-      transition:all var(--dur-fast) var(--ease-smooth);
-      color:var(--ink-muted);margin-bottom:-1px;
-    `;
-    btn.textContent = t.label;
-    btn.addEventListener('click', () => switchTab(t.id));
-    tabBar.appendChild(btn);
-    tabEls[t.id] = btn;
-  });
-
-  page.appendChild(tabBar);
   page.appendChild(content);
   container.appendChild(page);
 
-  function switchTab(id) {
-    activeTab = id;
-    Object.entries(tabEls).forEach(([tid, btn]) => {
-      const active = tid === id;
-      btn.style.color = active ? 'var(--gold)' : 'var(--ink-muted)';
-      btn.style.borderBottomColor = active ? 'var(--gold)' : 'transparent';
-    });
-    content.innerHTML = '';
-    if (id === 'character') renderCharacterTab();
-    else if (id === 'treasury') renderTreasuryTab();
-    else renderCatalogueTab();
-  }
-
-  switchTab('character');
+  if (mode === 'treasury') renderTreasuryTab();
+  else if (mode === 'catalogue') renderCatalogueTab();
+  else renderCharacterTab();
 
   /* ═══════════════════════════════════════════════════════════════
      TAB: MI INVENTARIO
