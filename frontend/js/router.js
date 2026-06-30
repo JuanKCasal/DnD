@@ -7,6 +7,8 @@ const routes = {
   '#/characters': () => import('../pages/characters.js').then(m => m.render),
   '#/sessions':   () => import('../pages/sessions.js').then(m => m.render),
   '#/inventory':  () => import('../pages/inventory.js').then(m => m.render),
+  '#/treasury':   () => import('../pages/inventory.js').then(m => m.render),
+  '#/catalogue':  () => import('../pages/inventory.js').then(m => m.render),
   '#/members':    () => import('../pages/members.js').then(m => m.render),
 };
 
@@ -30,17 +32,18 @@ const NAV_GROUPS = [
     label: 'Mi DnD',
     items: [
       { icon: '👤', label: 'Perfil',      desc: 'Tu cuenta y preferencias', route: '#/perfil',    disabled: true },
-      { icon: '🧙', label: 'Personajes',  desc: 'Fichas y stats',           route: '#/characters'              },
-      { icon: '🎒', label: 'Inventario',  desc: 'Items, tesoro y catálogo', route: '#/inventory'               },
+      { icon: '🧙', label: 'Personajes',        desc: 'Fichas y stats',                route: '#/characters'  },
+      { icon: '🎒', label: 'Inventario del Jugador', desc: 'Tu equipamiento entre personajes', route: '#/inventory' },
     ],
   },
   {
     type: 'dropdown',
     label: 'Juego',
     items: [
-      { icon: '🗺️', label: 'Campañas',   desc: 'Gestiona tus aventuras',   route: '#/campaigns'               },
-      { icon: '📜', label: 'Sesiones',    desc: 'Crónicas y asistencia',    route: '#/sessions'                },
-      { icon: '⚔️', label: 'Misiones',   desc: 'Quests y objetivos',       route: '#/misiones',  disabled: true },
+      { icon: '🗺️', label: 'Campañas',   desc: 'Gestiona tus aventuras',       route: '#/campaigns'               },
+      { icon: '📜', label: 'Sesiones',    desc: 'Crónicas y asistencia',       route: '#/sessions'                },
+      { icon: '💰', label: 'Tesoros',     desc: 'Items y monedas del grupo',   route: '#/treasury'                },
+      { icon: '⚔️', label: 'Misiones',   desc: 'Quests y objetivos',          route: '#/misiones',  disabled: true },
     ],
   },
   {
@@ -63,8 +66,9 @@ const NAV_GROUPS = [
     type: 'dropdown',
     label: 'Configuración',
     items: [
-      { icon: '👥', label: 'Miembros',   desc: 'Jugadores y roles',      route: '#/members'             },
-      { icon: '📋', label: 'Event Log',  desc: 'Historial de eventos',   route: '#/eventlog', disabled: true },
+      { icon: '👥', label: 'Miembros',   desc: 'Jugadores y roles',                route: '#/members'              },
+      { icon: '📦', label: 'Catálogo',   desc: 'Items disponibles en la comunidad', route: '#/catalogue'            },
+      { icon: '📋', label: 'Event Log',  desc: 'Historial de eventos',             route: '#/eventlog', disabled: true },
     ],
   },
 ];

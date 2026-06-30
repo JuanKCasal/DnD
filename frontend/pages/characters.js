@@ -534,6 +534,7 @@ export async function render(container) {
       { id: 'habilidades', label: 'Habilidades' },
       { id: 'hechizos',    label: 'Hechizos' },
       { id: 'rasgos',      label: 'Rasgos' },
+      { id: 'inventario',  label: '🎒 Inventario' },
     ];
 
     const tabBar = document.createElement('div');
@@ -562,6 +563,17 @@ export async function render(container) {
     wrap.appendChild(tabBar);
     Object.values(panels).forEach(p => wrap.appendChild(p));
     tabBar.querySelector('button').click();
+
+    /* ─── Lazy-load TAB: INVENTARIO ─── */
+    {
+      let invLoaded = false;
+      const invBtn = tabBar.querySelector('[data-tab="inventario"]');
+      if (invBtn) {
+        invBtn.addEventListener('click', () => {
+          if (!invLoaded) { invLoaded = true; renderShInventario(panels['inventario']); }
+        });
+      }
+    }
 
     /* ─── TAB 1: GENERAL ─── */
     const p1 = panels['general'];
@@ -932,6 +944,265 @@ export async function render(container) {
       empty.style.cssText = 'text-align:center;padding:48px;color:var(--ink-muted);';
       empty.innerHTML = '<div style="font-size:36px;margin-bottom:12px;">📜</div><div style="font-size:13px;">Sin rasgos registrados aún</div>';
       p4.appendChild(empty);
+    }
+
+    /* ─── TAB 5: INVENTARIO ─── */
+    async function renderShInventario(el) {
+      el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--ink-muted);font-size:13px;">Cargando inventario…</div>';
+
+      const RARITY_COLOR = {
+        common:'#6B6460', uncommon:'#2D6A4F', rare:'#1a5fa8',
+        very_rare:'#7b3fa0', legendary:'#c97a0a', artifact:'#9B2335',
+      };
+      const TYPE_ICON = {
+        weapon:'⚔️', armor:'🛡️', potion:'⚗️', spell_scroll:'📜',
+        ring:'💍', rod:'🪄', staff:'🏑', wand:'✨', wondrous:'🌟',
+        tool:'🔧', ammunition:'🏹', gear:'🎒', treasure:'💰',
+        vehicle:'🚢', other:'📦',
+      };
+
+      const render = async () => {
+        el.innerHTML = '';
+        let items = [];
+        try {
+          const res = await api.get(`/characters/${c.id}/inventory`);
+          items = res.data ?? [];
+        } catch (err) {
+          el.innerHTML = `<div style="text-align:center;padding:32px;color:var(--crimson);font-size:13px;">${err.message}</div>`;
+          return;
+        }
+
+        /* Add button */
+        const addRow = document.createElement('div');
+        addRow.style.cssText = 'display:flex;justify-content:flex-end;margin-bottom:16px;';
+        const addBtn = document.createElement('button');
+        addBtn.className = 'btn btn-primary';
+        addBtn.style.cssText = 'font-size:13px;padding:8px 16px;';
+        addBtn.textContent = '+ Añadir item';
+        addBtn.addEventListener('click', () => openInvAddModal(c.id, render));
+        addRow.appendChild(addBtn);
+        el.appendChild(addRow);
+
+        if (!items.length) {
+          const empty = document.createElement('div');
+          empty.style.cssText = 'text-align:center;padding:48px;color:var(--ink-muted);';
+          empty.innerHTML = '<div style="font-size:36px;margin-bottom:12px;">🎒</div><div style="font-size:13px;">El inventario está vacío</div>';
+          el.appendChild(empty);
+          return;
+        }
+
+        const list = document.createElement('div');
+        list.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
+
+        items.forEach(item => {
+          const row = document.createElement('div');
+          row.style.cssText = `
+            display:flex;align-items:center;gap:12px;
+            background:var(--stone-light);border:1px solid var(--border);
+            border-radius:8px;padding:10px 14px;
+            transition:box-shadow var(--dur-fast) var(--ease-smooth);
+          `;
+
+          const icon = document.createElement('span');
+          icon.style.cssText = 'font-size:18px;flex-shrink:0;';
+          icon.textContent = TYPE_ICON[item.type] ?? '📦';
+
+          const info = document.createElement('div');
+          info.style.cssText = 'flex:1;min-width:0;';
+
+          const name = document.createElement('div');
+          name.style.cssText = 'font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+          name.textContent = item.custom_name || item.name;
+
+          const meta = document.createElement('div');
+          meta.style.cssText = 'font-size:11px;color:var(--ink-muted);margin-top:2px;';
+          const rarityColor = RARITY_COLOR[item.rarity] ?? 'var(--ink-muted)';
+          meta.innerHTML = `<span style="color:${rarityColor};font-weight:600;">${item.rarity ?? ''}</span>${item.rarity && item.type ? ' · ' : ''}<span>${item.type ?? ''}</span>${item.quantity > 1 ? ` · ×${item.quantity}` : ''}`;
+
+          info.appendChild(name);
+          info.appendChild(meta);
+
+          const actions = document.createElement('div');
+          actions.style.cssText = 'display:flex;gap:6px;flex-shrink:0;';
+
+          /* Equip toggle */
+          const equipBtn = document.createElement('button');
+          equipBtn.style.cssText = `
+            font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;border:1px solid;
+            background:${item.equipped ? 'var(--gold)' : 'transparent'};
+            color:${item.equipped ? '#fff' : 'var(--ink-muted)'};
+            border-color:${item.equipped ? 'var(--gold)' : 'var(--border)'};
+            transition:all var(--dur-fast) var(--ease-smooth);
+          `;
+          equipBtn.textContent = item.equipped ? 'Equipado' : 'Equipar';
+          equipBtn.addEventListener('click', async () => {
+            try {
+              await api.put(`/characters/${c.id}/inventory/${item.item_id}`, { equipped: !item.equipped });
+              render();
+            } catch (err) { toast.error('Error', err.message); }
+          });
+
+          /* Remove button */
+          const removeBtn = document.createElement('button');
+          removeBtn.style.cssText = `
+            font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;
+            background:transparent;border:1px solid var(--crimson);color:var(--crimson);
+            transition:all var(--dur-fast) var(--ease-smooth);
+          `;
+          removeBtn.textContent = 'Quitar';
+          removeBtn.addEventListener('click', async () => {
+            if (!confirm(`¿Quitar "${item.name}" del inventario?`)) return;
+            try {
+              await api.del(`/characters/${c.id}/inventory/${item.item_id}`);
+              render();
+            } catch (err) { toast.error('Error', err.message); }
+          });
+
+          actions.appendChild(equipBtn);
+          actions.appendChild(removeBtn);
+          row.appendChild(icon);
+          row.appendChild(info);
+          row.appendChild(actions);
+          list.appendChild(row);
+        });
+
+        el.appendChild(list);
+      };
+
+      await render();
+    }
+
+    async function openInvAddModal(charId, onSuccess) {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position:fixed;inset:0;background:rgba(9,8,10,0.85);
+        backdrop-filter:blur(8px);z-index:2000;
+        display:flex;align-items:center;justify-content:center;
+        padding:32px 16px;animation:fadeIn var(--dur-normal) var(--ease-smooth);
+      `;
+
+      const modal = document.createElement('div');
+      modal.style.cssText = `
+        background:var(--stone);border:1px solid var(--border);
+        border-radius:12px;padding:28px;width:100%;max-width:520px;
+        box-shadow:0 24px 64px rgba(0,0,0,0.3);
+      `;
+
+      const title = document.createElement('div');
+      title.style.cssText = 'font-family:var(--font-display);font-size:18px;font-weight:700;color:var(--ink);margin-bottom:20px;';
+      title.textContent = '+ Añadir item al inventario';
+      modal.appendChild(title);
+
+      /* Search */
+      const searchInput = document.createElement('input');
+      searchInput.className = 'input';
+      searchInput.placeholder = 'Buscar item por nombre…';
+      searchInput.style.cssText = 'margin-bottom:12px;';
+      modal.appendChild(searchInput);
+
+      const resultList = document.createElement('div');
+      resultList.style.cssText = 'max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:16px;';
+      modal.appendChild(resultList);
+
+      let selectedItem = null;
+
+      const renderResults = async (q) => {
+        resultList.innerHTML = '<div style="padding:12px;text-align:center;font-size:12px;color:var(--ink-muted);">Buscando…</div>';
+        try {
+          const res = await api.get(`/items?search=${encodeURIComponent(q)}&per_page=20`);
+          const items = res.data ?? [];
+          resultList.innerHTML = '';
+          if (!items.length) {
+            resultList.innerHTML = '<div style="padding:12px;text-align:center;font-size:12px;color:var(--ink-muted);">Sin resultados</div>';
+            return;
+          }
+          items.forEach(it => {
+            const row = document.createElement('button');
+            row.style.cssText = `
+              display:block;width:100%;text-align:left;padding:10px 14px;
+              background:transparent;border:none;border-bottom:1px solid var(--border);
+              cursor:pointer;font-size:13px;color:var(--ink);
+              transition:background var(--dur-fast);
+            `;
+            row.textContent = it.name + (it.rarity ? ` (${it.rarity})` : '');
+            row.addEventListener('mouseenter', () => row.style.background = 'var(--stone-light)');
+            row.addEventListener('mouseleave', () => {
+              row.style.background = selectedItem?.id === it.id ? 'var(--gold-glow)' : 'transparent';
+            });
+            row.addEventListener('click', () => {
+              selectedItem = it;
+              resultList.querySelectorAll('button').forEach(b => b.style.background = 'transparent');
+              row.style.background = 'var(--gold-glow)';
+            });
+            resultList.appendChild(row);
+          });
+        } catch (err) {
+          resultList.innerHTML = `<div style="padding:12px;color:var(--crimson);font-size:12px;">${err.message}</div>`;
+        }
+      };
+
+      /* Initial load */
+      renderResults('');
+
+      let searchTimer;
+      searchInput.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => renderResults(searchInput.value.trim()), 350);
+      });
+
+      /* Quantity */
+      const qRow = document.createElement('div');
+      qRow.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:20px;';
+      const qLabel = document.createElement('label');
+      qLabel.style.cssText = 'font-size:13px;color:var(--ink-muted);white-space:nowrap;';
+      qLabel.textContent = 'Cantidad:';
+      const qInput = document.createElement('input');
+      qInput.type = 'number'; qInput.min = 1; qInput.value = 1;
+      qInput.className = 'input';
+      qInput.style.cssText = 'width:80px;';
+      qRow.appendChild(qLabel);
+      qRow.appendChild(qInput);
+      modal.appendChild(qRow);
+
+      /* Buttons */
+      const btnRow = document.createElement('div');
+      btnRow.style.cssText = 'display:flex;gap:10px;';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'btn';
+      cancelBtn.style.cssText = 'flex:1;background:transparent;border:1px solid var(--border);color:var(--ink-muted);';
+      cancelBtn.textContent = 'Cancelar';
+      cancelBtn.addEventListener('click', () => overlay.remove());
+
+      const addBtn = document.createElement('button');
+      addBtn.className = 'btn btn-primary';
+      addBtn.style.cssText = 'flex:2;';
+      addBtn.textContent = 'Añadir';
+      addBtn.addEventListener('click', async () => {
+        if (!selectedItem) { toast.error('Selecciona un item', ''); return; }
+        const qty = parseInt(qInput.value) || 1;
+        addBtn.disabled = true; addBtn.textContent = 'Añadiendo…';
+        try {
+          await api.post(`/characters/${charId}/inventory`, { item_id: selectedItem.id, quantity: qty });
+          toast.success('Item añadido', selectedItem.name);
+          overlay.remove();
+          onSuccess();
+        } catch (err) {
+          toast.error('Error', err.message);
+          addBtn.disabled = false; addBtn.textContent = 'Añadir';
+        }
+      });
+
+      btnRow.appendChild(cancelBtn);
+      btnRow.appendChild(addBtn);
+      modal.appendChild(btnRow);
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+      document.addEventListener('keydown', function esc(e) {
+        if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
+      });
+      setTimeout(() => searchInput.focus(), 100);
     }
 
     /* Animate after mount */
