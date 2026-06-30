@@ -41,6 +41,8 @@ certs/
 └── service.key      ← Clave privada Kafka
 ```
 
+**Railway env vars:** Los certs se pasan en base64 (`AIVEN_CA_CERT_B64`, `AIVEN_KAFKA_CERT_B64`, `AIVEN_KAFKA_KEY_B64`). `config.py` los decodifica con padding correcto (`rstrip('=')` + `len % 4`).
+
 ---
 
 ## Skills activas en este proyecto
@@ -83,6 +85,7 @@ DnD/
 ├── README.md
 ├── .env.example
 ├── .gitignore
+├── reset_admin.py                 ← Utilidad para resetear password de admin
 │
 ├── .agents/                       ← Skills instaladas (NO editar manualmente)
 │   └── skills/
@@ -99,55 +102,65 @@ DnD/
 │   └── service.key
 │
 ├── frontend/                      ← SPA → GitHub Pages
-│   ├── index.html
+│   ├── index.html                 # Cache-bust: v=20260629
 │   ├── css/
-│   │   ├── main.css               # Design system + tokens
+│   │   ├── main.css               # Design system + tokens (light theme)
 │   │   ├── animations.css         # Keyframes y transiciones
 │   │   └── components.css         # Componentes reutilizables
 │   ├── js/
 │   │   ├── api.js                 # Fetch centralizado con JWT
 │   │   ├── auth.js                # Sesión, roles, guards
-│   │   ├── router.js              # Hash-based SPA router
+│   │   ├── router.js              # Hash-based SPA + nav horizontal con mega-menu
 │   │   ├── utils.js               # Helpers (dice, formatters, etc.)
 │   │   └── components/
 │   │       ├── toast.js           # Notificaciones estilo Sonner
-│   │       ├── modal.js           # Diálogos con animación spring
-│   │       ├── card.js            # Campaign/character cards
-│   │       └── dice-roller.js     # Componente de dados 3D
+│   │       └── modal.js           # Diálogos con animación spring
 │   └── pages/
 │       ├── login.js
 │       ├── dashboard.js
 │       ├── campaigns.js
-│       ├── characters.js
+│       ├── characters.js          # Ficha completa D&D 5e + edit/delete cards
 │       ├── sessions.js
 │       ├── inventory.js
 │       └── members.js
 │
 ├── api/                           ← FastAPI → Railway
-│   ├── main.py
-│   ├── config.py
-│   ├── dependencies.py
+│   ├── main.py                    # App, CORS, lifespan, routers
+│   ├── config.py                  # Settings, cert decoding, CORS origins
+│   ├── dependencies.py            # get_db, get_current_user, require_role, hash_password
 │   ├── requirements.txt
 │   ├── db/
 │   │   ├── connection.py          # Pool asyncpg + SSL Aiven
-│   │   └── kafka.py               # Productor/consumidor Kafka
+│   │   ├── kafka.py               # Productor/consumidor Kafka + topics
+│   │   └── helpers.py             # paginate, list_response, item_response, records_to_list, log_event
 │   ├── models/
-│   │   ├── member.py
-│   │   ├── campaign.py
-│   │   ├── character.py
-│   │   ├── session.py
-│   │   └── inventory.py
+│   │   ├── auth.py                # LoginRequest, Token, TokenData
+│   │   ├── member.py              # MemberCreate, MemberUpdate, MemberOut
+│   │   ├── campaign.py            # CampaignCreate, CampaignUpdate, CampaignOut
+│   │   ├── character.py           # CharacterCreate, CharacterUpdate, CharacterOut, HPUpdate, etc.
+│   │   ├── session_model.py       # SessionCreate, SessionUpdate, SessionOut
+│   │   ├── item.py                # ItemCreate, ItemUpdate, ItemOut, InventoryAdd
+│   │   ├── inventory_model.py     # Extended item fields (magical, damage, ac_base, etc.)
+│   │   ├── rank.py                # RankCreate, RankUpdate, RankOut
+│   │   ├── clan.py                # ClanCreate, ClanUpdate, ClanOut, ClanInvitationCreate
+│   │   ├── chat.py                # ChatRoomCreate/Out, ChatMessageCreate/Out, DirectMessageCreate/Out
+│   │   └── event.py               # EventLogOut
 │   └── routers/
-│       ├── auth.py
-│       ├── members.py
-│       ├── campaigns.py
-│       ├── characters.py
-│       ├── sessions.py
-│       └── inventory.py
+│       ├── auth.py                # POST /login, /register
+│       ├── members.py             # GET/POST/PUT /members (POST admin-only)
+│       ├── campaigns.py           # CRUD /campaigns + DELETE
+│       ├── characters.py          # CRUD /characters + DELETE + /hp /conditions /spell-slots /inventory
+│       ├── sessions.py            # CRUD /sessions + DELETE + asistencia
+│       ├── inventory.py           # GET/POST/PUT/DELETE /items + campaign treasury
+│       ├── ranks.py               # CRUD /ranks
+│       ├── clans.py               # CRUD /clans + membership + invitations
+│       ├── chat.py                # GET/POST /chat/rooms + /messages + DMs
+│       └── events.py              # GET /events (event log público)
 │
 ├── db/
+│   ├── migrate.py                 ← Runner de migraciones
 │   └── migrations/
-│       ├── 001_initial_schema.sql
+│       ├── 001_initial_schema.sql # Schema v2.0 completo (656 líneas)
 │       └── README.md
 │
 └── .github/
@@ -160,34 +173,34 @@ DnD/
 ## Design System — Identidad Visual
 
 ### Filosofía
-La app debe sentirse como un **artefacto del mundo de D&D digitalizado**: pergamino oscuro, oro envejecido, runas como detalles decorativos, pero con la claridad y velocidad de un producto SaaS moderno. No un juego retro — una herramienta premium para jugadores serios.
+La app debe sentirse como un **artefacto del mundo de D&D digitalizado**: pergamino claro, oro antiguo, runas como detalles decorativos, pero con la claridad y velocidad de un producto SaaS moderno. No un juego retro — una herramienta premium para jugadores serios.
 
-### Tokens de color
+### Tokens de color (Light Theme — vigente desde Fase 6)
 ```css
 :root {
   /* Fondos */
-  --void:         #09080A;   /* negro profundo con tinte violeta */
-  --stone:        #141218;   /* paneles principales */
-  --stone-light:  #1C1820;   /* hover states, cards elevadas */
-  --border:       #2A2430;   /* bordes sutiles */
+  --void:         #F5F3EE;   /* crema pergamino — fondo página */
+  --stone:        #FFFFFF;   /* paneles principales */
+  --stone-light:  #FAF9F7;   /* hover states, cards elevadas */
+  --border:       #E8E4DC;   /* bordes sutiles */
 
   /* Acento dorado — la firma visual */
-  --gold:         #C9A84C;   /* dorado envejecido, NO amarillo brillante */
-  --gold-dim:     #8A6E2F;   /* estados secundarios */
-  --gold-glow:    rgba(201, 168, 76, 0.15);
+  --gold:         #7A5C0A;   /* dorado envejecido en light */
+  --gold-dim:     #A67C1A;   /* estados secundarios */
+  --gold-glow:    rgba(122, 92, 10, 0.12);
 
   /* Acento rojo — combate, alertas */
   --crimson:      #9B2335;
-  --crimson-dim:  rgba(155, 35, 53, 0.2);
+  --crimson-dim:  rgba(155, 35, 53, 0.12);
 
   /* Texto */
-  --ink:          #EDE8DF;
-  --ink-muted:    #7D7468;
-  --ink-faint:    #3D3830;
+  --ink:          #1A1714;
+  --ink-muted:    #6B6460;
+  --ink-faint:    #C4BDB5;
 
   /* Semánticos */
-  --success:      #3D6B4F;
-  --warning:      #7A5C1E;
+  --success:      #2D6A4F;
+  --warning:      #7A5C0A;
   --danger:       var(--crimson);
 }
 ```
@@ -203,7 +216,7 @@ La app debe sentirse como un **artefacto del mundo de D&D digitalizado**: pergam
 
 ### Motion — principios de animación (Emil Design Eng)
 ```css
---ease-spring:   cubic-bezier(0.34, 1.56, 0.64, 1);  /* bounce suave */
+--ease-spring:   cubic-bezier(0.34, 1.56, 0.64, 1);
 --ease-smooth:   cubic-bezier(0.4, 0, 0.2, 1);
 --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 
@@ -219,80 +232,109 @@ La app debe sentirse como un **artefacto del mundo de D&D digitalizado**: pergam
   Botones active     : scale(0.97), dur-instant
   Modales            : scale(0.95)→1 + opacity, dur-normal, ease-spring
   Toasts             : slideInFromBottom + fade, dur-normal, ease-spring
-  Dados              : rotación 3D CSS keyframes, dur-dramatic
 */
 ```
 
-### Efectos especiales
-- **Glow dorado** en hover: `box-shadow: 0 0 0 1px var(--gold-dim), 0 0 24px var(--gold-glow)`
-- **Textura grain** en headers: SVG filter inline (sin imágenes externas)
-- **Runas ornamentales** en separadores: `᛭ ᚱ ᚢ ᚾ`
-- **Contador animado** en stats de personaje: 0 → valor real al cargar
+---
+
+## Navegación — Top Nav Horizontal
+
+Estructura del mega-menu (en `router.js`, constante `NAV_GROUPS`):
+
+- **Noticias** *(deshabilitado)*
+- **Dashboard**
+- **Mi DnD:** Personajes, Inventario | Perfil *(deshabilitado)*
+- **Juego:** Campañas, Sesiones | Misiones *(deshabilitado)*
+- **Mundo:** Clanes, Salón de la Fama *(deshabilitados)*
+- **Comunidad:** Chat, Calendario & Eventos *(deshabilitados)*
+- **Configuración:** Miembros | Event Log *(deshabilitado)*
+
+Items deshabilitados: badge "Próximamente", `cursor:not-allowed`, no clickeables.
+`max-width: 1300px` global en nav, main-content y todas las páginas.
 
 ---
 
-## Componentes Core — Especificaciones
+## Modelo de Datos — Schema v2.0
 
-### Toast (Notificaciones)
-Inspirado en Sonner. Vanilla JS puro:
-- Stack bottom-right, máx 3 visibles simultáneos
-- Tipos: `success` `error` `info` `dice`
-- Auto-dismiss 4s con barra de progreso animada
-- Hover pausa el timer; swipe-to-dismiss en mobile
-
-### Modal
-- Backdrop: `backdrop-filter: blur(8px)` + `rgba(9,8,10,0.8)`
-- Entrada: scale(0.95) + opacity 0→1, ease-spring 250ms
-- Salida: scale(0.98) + opacity 1→0, ease-smooth 150ms
-- Trap focus; cerrar con Escape
-
-### Cards de Campaña
-- Borde izquierdo 3px: dorado=activa, gris=archivada, crimson=en pausa
-- Hover: `translateY(-3px)` + gold glow
-- Badge de sistema (D&D 5e, Pathfinder, etc.)
-- Avatar del DM esquina superior derecha
-
-### Ficha de Personaje
-- Grid 3×2 para las 6 stats con counter animado al cargar
-- Barra HP gradiente crimson→verde según porcentaje
-- Nivel con d20 que rota en hover
-- Tabs animados para hechizos por nivel
-
-### Dice Roller (global)
-- Activar con `/roll` o botón flotante (bottom-left)
-- Soporte: d4 d6 d8 d10 d12 d20 d100
-- Animación 3D CSS mientras "cae"
-- Historial de últimas 10 tiradas en sesión
-- Modificadores: `/roll 2d6+3`
-
----
-
-## Modelo de Datos
-
+### Enums definidos
 ```sql
--- Enums
-CREATE TYPE member_role     AS ENUM ('admin', 'dm', 'player');
-CREATE TYPE campaign_status AS ENUM ('active', 'paused', 'completed', 'archived');
-CREATE TYPE item_type       AS ENUM ('weapon','armor','potion','spell_scroll','tool','treasure','wondrous','ammunition','other');
-CREATE TYPE item_rarity     AS ENUM ('common','uncommon','rare','very_rare','legendary','artifact');
-
--- Tablas
-members             (id UUID PK, username, email, discord_handle, role, password_hash, active, created_at, updated_at)
-campaigns           (id UUID PK, name, slug UNIQUE, dm_id→members, system, status, description, start_date, end_date, created_at)
-campaign_members    (campaign_id→campaigns, member_id→members, joined_at)
-characters          (id UUID PK, member_id→members, campaign_id→campaigns, name, race, class, subclass, level 1-20, background, stats_json JSONB, notes, active, created_at)
-sessions            (id UUID PK, campaign_id→campaigns, session_number, title, date, summary, created_by→members, created_at)
-session_attendance  (session_id→sessions, member_id→members, character_id→characters, present)
-items               (id UUID PK, name, description, type, rarity, weight, value_gp)
-character_inventory (character_id→characters, item_id→items, quantity, equipped, notes)
-campaign_treasury   (campaign_id→campaigns, item_id→items, quantity, gold_pieces, notes, updated_at)
-
--- stats_json D&D 5e:
--- { "str":10, "dex":10, "con":10, "int":10, "wis":10, "cha":10,
---   "hp":8, "max_hp":8, "ac":10, "speed":30, "prof_bonus":2,
---   "initiative":0, "passive_perception":10,
---   "saving_throws":{...}, "skills":{...}, "spell_slots":{...} }
+member_role:     'admin' | 'dm' | 'player'
+clan_role:       'leader' | 'officer' | 'veteran' | 'member' | 'initiate'
+campaign_status: 'active' | 'paused' | 'completed' | 'archived'
+quest_status:    'active' | 'completed' | 'failed' | 'abandoned'
+location_type:   'city' | 'dungeon' | 'wilderness' | 'plane' | 'region' | 'poi'
+npc_relationship:'ally' | 'enemy' | 'neutral' | 'unknown'
+alignment_type:  'LG'|'NG'|'CG'|'LN'|'TN'|'CN'|'LE'|'NE'|'CE'
+invite_status:   'pending' | 'accepted' | 'rejected'
+item_type:       'weapon'|'armor'|'potion'|'spell_scroll'|'ring'|'rod'|'staff'|'wand'|
+                 'wondrous'|'tool'|'ammunition'|'gear'|'treasure'|'vehicle'|'other'
+item_rarity:     'common'|'uncommon'|'rare'|'very_rare'|'legendary'|'artifact'
+chat_room_type:  'general'|'clan'|'rank'|'campaign'|'dm_channel'|'ooc'|'announcements'
+message_type:    'ic'|'ooc'|'dice'|'emote'|'system'|'whisper'
+dm_message_type: 'ic'|'ooc'|'whisper'
 ```
+
+### Tablas principales
+```
+ranks               (id, name, slug, description, color_hex, icon_url, level, permissions JSONB, xp_threshold)
+members             (id, username, email, password_hash, display_name, avatar_url, discord_handle, discord_id,
+                     role::member_role, rank_id→ranks, bio, timezone, active_character_id, active, last_seen_at)
+member_xp           (member_id→members PK, total_xp, sessions_attended, messages_sent)
+
+clans               (id, name, slug, description, motto, emblem_url, color_hex, alignment, leader_member_id,
+                     is_public, requires_approval, max_members, lore, active)
+clan_members        (clan_id, member_id PK, clan_role, title, contribution_pts, joined_at, approved_by)
+clan_invitations    (id, clan_id, invited_member_id, invited_by, status::invite_status, resolved_at)
+
+campaigns           (id, name, slug UNIQUE, dm_id→members, system, status::campaign_status, description,
+                     lore, cover_image_url, is_public, world_name, setting, start_date, end_date)
+campaign_members    (campaign_id, member_id PK, joined_at)
+
+characters          (id, member_id→members, campaign_id→campaigns, name, race, subrace, class, subclass,
+                     background, alignment::alignment_type, deity, level 1-20, xp, inspiration,
+                     str, dex, con, int, wis, cha,
+                     hp, max_hp, temp_hp, ac, initiative_bonus, speed, prof_bonus, passive_perception,
+                     spell_slots JSONB, conditions TEXT[], feats JSONB, saving_throws JSONB, skills JSONB,
+                     portrait_url, backstory, personality_traits, ideals, bonds, flaws, notes,
+                     active, created_at)
+character_currency  (character_id→characters PK, pp, gp, ep, sp, cp)
+
+sessions            (id, campaign_id→campaigns, session_number AUTO, title, date, duration_minutes,
+                     summary, highlights TEXT[], created_by→members)
+session_attendance  (session_id, member_id PK, character_id→characters, present)
+
+items               (id, name, description, type::item_type, rarity::item_rarity, weight, value_gp,
+                     is_magical, is_consumable, requires_attunement, attunement_restriction,
+                     damage_dice, damage_type, ac_base, source_book, source_page)
+character_inventory (character_id, item_id PK, quantity, equipped, attuned, notes, custom_name)
+campaign_treasury   (campaign_id, item_id PK, quantity, notes, updated_at)
+campaign_currency   (campaign_id→campaigns PK, pp, gp, ep, sp, cp, notes)
+
+chat_rooms          (id, name, slug, type::chat_room_type, clan_id, campaign_id, rank_required_id,
+                     description, icon, is_readonly, is_ic, sort_order)
+chat_messages       (id, room_id→chat_rooms, member_id→members, character_id→characters,
+                     message_type::message_type, content, dice_result JSONB, reply_to_id, is_pinned)
+direct_messages     (id, from_character_id, to_character_id, content, message_type::dm_message_type, read_at)
+
+event_log           (id, occurred_at, actor_member_id, actor_character_id, action, target_type,
+                     target_id, target_name, before JSONB, after JSONB, metadata JSONB, is_public)
+```
+
+### Mapeo campos Pydantic ↔ columnas DB en Characters
+
+Los nombres de columna en PostgreSQL usan palabras reservadas sin sufijo:
+
+| Pydantic field | DB column |
+|---------------|-----------|
+| `char_class` | `class` |
+| `str_score` | `str` |
+| `dex_score` | `dex` |
+| `con_score` | `con` |
+| `int_score` | `int` |
+| `wis_score` | `wis` |
+| `cha_score` | `cha` |
+
+En los SELECT se usan aliases: `c.str AS str_score`, etc. El router incluye `_character_select()` que devuelve el SELECT completo. El `col_map` en `update_character` mapea automáticamente.
 
 ---
 
@@ -306,6 +348,7 @@ campaign_treasury   (campaign_id→campaigns, item_id→items, quantity, gold_pi
 | Registrar sesión | ✅ | ✅ solo su campaña | ❌ |
 | Crear personaje | ✅ | ✅ | ✅ |
 | Editar personaje | ✅ | ✅ | ✅ solo el propio |
+| Eliminar personaje | ✅ | ✅ | ✅ solo el propio |
 | Ver inventario campaña | ✅ | ✅ | ✅ si participa |
 | Modificar tesoro | ✅ | ✅ solo su campaña | ❌ |
 
@@ -318,10 +361,10 @@ campaign_treasury   (campaign_id→campaigns, item_id→items, quantity, gold_pi
 - Router hash-based: `#/dashboard`, `#/campaigns`, `#/characters`, etc.
 - JWT en `localStorage` clave `dnd_token`; user info en `dnd_user`
 - `api.js` inyecta `Authorization: Bearer <token>` automáticamente
+- **DELETE method:** `api.del(path)` — no `api.delete` (palabra reservada JS)
 - Cada página exporta `render(container)` — función async que popula `#app`
-- Componentes en `js/components/` — funciones puras que retornan nodos DOM
 - Nunca innerHTML con datos del servidor sin sanitizar — usar textContent o DOMPurify
-- Animaciones: preferir CSS transitions/keyframes; Web Animations API solo para secuencias complejas
+- **Anti-truncación:** Después de editar archivos JS grandes, verificar con `tail -5` que el archivo cierra correctamente
 
 ### CSS
 - Variables CSS en `:root` para todos los tokens
@@ -332,16 +375,19 @@ campaign_treasury   (campaign_id→campaigns, item_id→items, quantity, gold_pi
 
 ### Backend (FastAPI)
 - Python 3.11+, type hints obligatorios
-- Pydantic v2 para schemas
+- Pydantic v2 — todos los modelos `*Out` deben incluir `model_config = {"from_attributes": True}`
 - `async/await` para DB y Kafka
 - Endpoints bajo `/api/v1/`
 - Respuesta lista: `{"data": [...], "meta": {"total": n, "page": n, "per_page": n}}`
 - Respuesta item: `{"data": {...}}`
 - Error: `{"error": {"code": "CAMPAIGN_NOT_FOUND", "message": "..."}}`
+- Usar `helpers.py`: `list_response()`, `item_response()`, `records_to_list()`, `log_event()`
+- **Anti-truncación:** Después de editar modelos, verificar con `python3 -c "import ast; ast.parse(open('file.py').read())"`
 
 ### Git
 - `main` → producción | `develop` → integración | `feature/nombre`
 - Commits: `feat:` `fix:` `db:` `style:` `docs:` `test:`
+- **Lock files:** Git lock desde el sandbox tiene permisos limitados — si falla, el usuario debe hacer commit/push desde PowerShell en Windows
 
 ---
 
@@ -351,13 +397,8 @@ campaign_treasury   (campaign_id→campaigns, item_id→items, quantity, gold_pi
 ```python
 # api/db/connection.py
 import asyncpg, ssl
-from api.config import get_settings
 
-_pool = None
-
-async def init_pool():
-    global _pool
-    settings = get_settings()
+async def init_pool(settings):
     ssl_ctx = ssl.create_default_context(cafile=settings.AIVEN_CA_CERT)
     _pool = await asyncpg.create_pool(
         dsn=settings.DATABASE_URL,
@@ -366,20 +407,13 @@ async def init_pool():
         max_size=10,
         command_timeout=30
     )
-
-def get_pool():
-    if _pool is None:
-        raise RuntimeError("Pool no inicializado")
-    return _pool
 ```
 
 ### Kafka
 ```python
-# api/db/kafka.py
-from aiokafka import AIOKafkaProducer
-import ssl, json
-
-# Topics: dnd.sessions.created | dnd.inventory.updated | dnd.characters.leveled_up
+# Topics activos:
+# dnd.sessions.created | dnd.inventory.updated | dnd.characters.leveled_up
+# (dnd.chat.message.sent definido pero consumidor pendiente)
 
 async def get_producer(settings):
     ssl_ctx = ssl.create_default_context(cafile=settings.KAFKA_SSL_CA_CERT)
@@ -399,126 +433,133 @@ async def get_producer(settings):
 ## Fases de Desarrollo
 
 ### Fase 1 — Base y Auth ✅ COMPLETADA
-**PostgreSQL y Kafka ya están configurados y activos en Aiven.**
-- [x] Crear `certs/ca.pem`, `certs/service.cert`, `certs/service.key` (contenidos en `.env`)
-- [x] Verificar conexión: `psql "$DATABASE_URL" -c "SELECT version();"`
-- [x] Ejecutar migración: `psql "$DATABASE_URL" -f db/migrations/001_initial_schema.sql`
-- [x] FastAPI funcional: health check, CORS, lifespan con pool
+- [x] Certs Aiven configurados (ca.pem, service.cert, service.key)
+- [x] PostgreSQL conectado con pool asyncpg + SSL
+- [x] Migración inicial ejecutada (schema v2.0, 656 líneas)
+- [x] FastAPI funcional: health check, CORS, lifespan
 - [x] Auth: POST `/api/v1/auth/login` y `/api/v1/auth/register`
 - [x] Members: GET/POST/PUT `/api/v1/members`
-- [x] Frontend: login con animación de entrada premium
-- [x] Frontend: dashboard con stats
-- [x] Habilitar GitHub Pages: Settings → Pages → Source: gh-pages branch
+- [x] Frontend: login + dashboard
+- [x] GitHub Pages habilitado
 
-**Notas Railway:** `api/Dockerfile` copia archivos en `./api/` para que `uvicorn api.main:app` funcione. Los certs se pasan como env vars en base64 (`AIVEN_CA_CERT_B64`, etc.) — `config.py` los decodifica con padding correcto (`rstrip('=')` + `len % 4`).
+**Nota Railway:** `api/Dockerfile` copia archivos en `./api/` para que `uvicorn api.main:app` funcione.
 
 ### Fase 2 — Campañas y Personajes ✅ COMPLETADA
-- [x] CRUD Campaigns (backend + frontend)
-- [x] CRUD Characters con stats D&D 5e (backend + frontend)
-- [ ] Vinculación personaje ↔ campaña ↔ jugador (UI pendiente — la DB ya lo soporta)
-- [x] Frontend: página campaigns con cards animadas, filtros por status, modal crear/editar
-- [x] Frontend: ficha de personaje completa con HP bar, grid de stats, counter animado, detail sheet
-
-**Nota importante:** Al editar `router.js` (o cualquier archivo JS grande), verificar siempre que el archivo no quede truncado antes de hacer commit — usar `tail -5` en bash para confirmar que cierra correctamente.
+- [x] CRUD Campaigns (backend + frontend con cards animadas)
+- [x] CRUD Characters con stats D&D 5e (backend + frontend con ficha completa)
 
 ### Fase 3 — Sesiones ✅ COMPLETADA
-- [x] CRUD Sessions + session_number automático
-- [x] Asistencia por sesión
-- [x] Crónicas en markdown (marked.js CDN)
-- [x] Kafka: publicar `dnd.sessions.created`
-- [x] Frontend: timeline de sesiones con cards, filtro por campaña, modal crear/editar, detail con tabs (crónica/highlights/asistencia)
+- [x] CRUD Sessions + session_number automático + asistencia
+- [x] Crónicas en markdown (marked.js CDN) + Kafka `dnd.sessions.created`
+- [x] Frontend: timeline con cards, filtro, modal, detail con tabs
 
-**Fix crítico:** Renombrar alias `date` → `Date` en `session_model.py` — Pydantic v2 conflicto entre nombre de campo y tipo importado `datetime.date`.
+**Fix crítico:** Alias `date` → `Date` en `session_model.py` — conflicto Pydantic v2 con tipo `datetime.date`.
 
 ### Fase 4 — Inventario y Tesoro ✅ COMPLETADA
-- [x] Catálogo de items con rarities (CRUD, filtros tipo/rareza/búsqueda)
-- [x] Inventario individual (equipar/desequipar, añadir/eliminar)
-- [x] Tesoro compartido por campaña + monedas (PP/PO/PE/PA/PC)
-- [x] Kafka: publicar `dnd.inventory.updated`
+- [x] Catálogo de items con rarities (CRUD, filtros)
+- [x] Inventario individual + Tesoro por campaña + monedas
+- [x] Kafka: `dnd.inventory.updated`
 - [x] Frontend: 3 tabs — Mi Inventario / Tesoro / Catálogo
 
-**Bug fix:** Modal huérfano — `buildModal` creaba overlay interno que nunca llegaba al DOM; solución: `overlay.appendChild(modal)` antes de `document.body.appendChild(overlay)`.
+**Bug fix:** Modal huérfano — `overlay.appendChild(modal)` antes de `document.body.appendChild(overlay)`.
 
 ### Fase 5 — Mejoras de Comunidad ✅ COMPLETADA
-- [x] Dashboard con estadísticas de comunidad (5 stats: miembros, campañas, sesiones, personajes, items)
-- [x] Página Miembros: grid de cards, perfil con personajes, edición de rol (admin), activar/desactivar
-- [x] Level-up tracker: botón "Subir nivel" en ficha de personaje, Kafka dnd.characters.leveled_up, toast
+- [x] Dashboard con 5 stats de comunidad en tiempo real
+- [x] Página Miembros: grid de cards, edición de rol (admin), activar/desactivar
+- [x] Level-up tracker: botón "Subir nivel" → Kafka `dnd.characters.leveled_up` → toast
 - [x] Editar HP desde la ficha de personaje
-- [ ] Kafka consumer → Discord Webhook (pendiente para Fase 6)
-- [ ] Dice roller global flotante (pendiente para Fase 6)
 
 ### Fase 6 — Rediseño UI + CRUD Completo ✅ COMPLETADA
 
-#### Rediseño visual (light theme + nav horizontal)
-- [x] **Tema claro** — tokens CSS completamente reescritos: `--void:#F5F3EE`, `--stone:#FFFFFF`, `--gold:#7A5C0A`, `--ink:#1A1714`
-- [x] **Nav horizontal** reemplaza el sidebar: `header.app-nav` fijo, `max-width:1300px`, hamburger en mobile
-- [x] **Mega-menu dropdown** con paneles de items (icono + nombre + descripción)
-- [x] **Drawer mobile** con backdrop y panel deslizante
-- [x] **Fondo del nav transparente** (`var(--void)`) sin borde inferior — estilo Eleken
-- [x] **Nueva estructura de navegación:**
-  - Noticias *(deshabilitado)*
-  - Dashboard
-  - Mi DnD: Personajes, Inventario | Perfil *(deshabilitado)*
-  - Juego: Campañas, Sesiones | Misiones *(deshabilitado)*
-  - Mundo: Clanes, Salón de la Fama *(deshabilitados)*
-  - Comunidad: Chat, Calendario & Eventos *(deshabilitados)*
-  - Configuración: Miembros | Event Log *(deshabilitado)*
-- [x] Items deshabilitados: badge "Próximamente", `cursor:not-allowed`, no clickeables
-- [x] **max-width global 1300px** en nav, main-content y todas las páginas
+#### Rediseño visual
+- [x] **Tema claro** — tokens CSS completamente reescritos (ver Design System)
+- [x] **Nav horizontal** con mega-menu y drawer mobile — `max-width: 1300px` global
+- [x] Items deshabilitados con badge "Próximamente"
 
-#### CRUD Miembros completo (admin)
-- [x] `POST /api/v1/members` — endpoint admin-only para crear miembros con rol específico
-- [x] `MemberUpdate` acepta `role` y `active` (solo admin puede cambiarlos)
-- [x] Botón **"+ Nuevo Miembro"** en la página (solo admin) → modal de creación completo
-- [x] Modal de edición upgradado a perfil completo: nombre, rol, discord, timezone, bio, activo/inactivo
+#### CRUD extendido
+- [x] `POST /api/v1/members` admin-only + modal de creación en UI
+- [x] `MemberUpdate` acepta `role` y `active`
+- [x] `DELETE /api/v1/campaigns/{id}` + `DELETE /api/v1/sessions/{id}` con botones en UI
 
-#### Eliminar registros
-- [x] **Eliminar campaña** — botón 🗑 en hover junto a "Editar", con confirmación → `DELETE /api/v1/campaigns/{id}`
-- [x] **Eliminar sesión** — botón 🗑 en la barra de acciones de cada card → `DELETE /api/v1/sessions/{id}`
-
-#### Fixes aplicados en esta fase
+#### Fixes aplicados
 - `dashboard.js` truncado → restaurado `emptyState()` completo
-- `user is not defined` en personajes → `auth.getUser()` movido al scope correcto de `openDetailSheet()`
-- Botón asistencia silencioso → eliminado `console.log` con `payload` undefined que bloqueaba el handler
+- `user is not defined` en personajes → `auth.getUser()` movido al scope correcto
+- Botón asistencia silencioso → `payload` undefined eliminado
 - `active` y `role` en `MemberUpdate` con cast correcto `::member_role` en SQL
+
+### Fase 7 — Personajes: Mejoras completas ✅ COMPLETADA
+
+- [x] **6 ability scores en cards** — list SQL incluye `c.str AS str_score`...`c.cha AS cha_score`
+- [x] **Edit/delete en cards** — botones hover (visibles para admin, dm y dueño del personaje)
+- [x] **Modal unificado create/edit** — `openCharacterModal(existing|null)` con secciones completas:
+  - Identidad: name, race, subrace, class, subclass, background, alignment, deity, level, campaign, portrait_url
+  - Combate: hp, max_hp, temp_hp, ac, speed, initiative_bonus, prof_bonus, passive_perception
+  - Puntuaciones (grid 3 col): str, dex, con, int, wis, cha
+  - Personalidad & Historia: personality_traits, ideals, bonds, flaws, backstory, notes
+- [x] **DELETE endpoint** — soft-delete (`active = FALSE`) con verificación de dueño
+- [x] **CharacterOut** incluye todos los campos (notes, personalidad, portrait_url, inspiration, xp, spell_slots, conditions, feats, saving_throws, skills, created_at)
+
+**⚠️ COMMIT PENDIENTE — ejecutar desde PowerShell:**
+```powershell
+cd C:\Users\casal\Claude\DnD
+git add api/routers/characters.py frontend/css/animations.css
+git commit -m "feat: personajes — SQL con 6 stats, DELETE endpoint, notas"
+git push origin main
+```
 
 ---
 
-## Instrucciones para el Agente (Claude Code)
+## Próximas Fases (Pendiente)
+
+### Fase 8 — Chat y Comunidad en tiempo real
+- [ ] Frontend: página Chat — rooms list + room view con mensajes IC/OOC/dice
+- [ ] Frontend: Direct Messages entre personajes
+- [ ] Frontend: Clanes — lista, perfil, membresía, invitaciones
+- [ ] Frontend: Rangos — tabla con colores y niveles de XP
+- [ ] Kafka consumer → Discord Webhook (level-up, session created)
+- [ ] Dice roller global flotante (bottom-left, `/roll 2d6+3`, d4/d6/d8/d10/d12/d20/d100)
+
+### Fase 9 — Worldbuilding y contenido
+- [ ] NPCs, Locations, Quests (tablas en schema, routers pendientes)
+- [ ] Salón de la Fama — miembros destacados, stats de comunidad
+- [ ] Calendario & Eventos
+- [ ] Event Log frontend page
+- [ ] Perfil de usuario completo
+
+---
+
+## Instrucciones para el Agente (Claude)
 
 ### Al iniciar una sesión nueva
 1. Leer este CLAUDE.md completo
 2. Verificar fase activa por los checkboxes
 3. Revisar skills en `.agents/skills/` antes de tocar UI
-4. Ejecutar `/impeccable init` si es la primera sesión en el proyecto
+4. Verificar con `git status` si hay cambios sin commitear
 
 ### Al trabajar en Frontend
 1. Consultar `emil-design-eng` para animaciones y microinteracciones
 2. Consultar `design-taste-frontend` y `high-end-visual-design` para decisiones estéticas
 3. Usar exclusivamente los tokens CSS de este documento
-4. Impeccable hook revisa automáticamente cada edit de UI
+4. Después de editar archivos JS grandes: `tail -5 archivo.js` para confirmar que no está truncado
 5. Probar en 375px (mobile) y 1280px (desktop)
 
 ### Al trabajar con datos D&D
 1. Consultar skill `dnd` para valores canónicos D&D 5e
-2. Stats, spell slots, proficiencies — siempre del SRD vía la skill `dnd`
-3. `stats_json` sigue el schema de la sección Modelo de Datos
+2. Columnas DB de stats: `str`, `dex`, `con`, `int`, `wis`, `cha` (sin sufijo `_score`)
+3. En Pydantic usar `str_score`, etc. — el `col_map` del router mapea automáticamente
 
 ### Al crear un componente
 ```
 1. HTML semántico primero
 2. Tokens CSS (nunca valores hardcoded)
 3. Transiciones según principios de motion
-4. Verificar con impeccable
-5. Testear teclado: Tab, Enter, Escape
+4. Testear teclado: Tab, Enter, Escape
 ```
 
 ### Comandos útiles
 ```bash
 # Backend local
-cd api
-pip install -r requirements.txt
-uvicorn api.main:app --reload --port 8000
+cd api && uvicorn api.main:app --reload --port 8000
 # Docs: http://localhost:8000/api/docs
 
 # Verificar conexión PostgreSQL
@@ -528,11 +569,11 @@ psql "$DATABASE_URL" -c "SELECT version();"
 psql "$DATABASE_URL" -f db/migrations/001_initial_schema.sql
 
 # Frontend local
-cd frontend
-python -m http.server 3000
+cd frontend && python -m http.server 3000
 
-# Tests
-cd api && pytest tests/ -v
+# Verificar archivos no truncados
+tail -5 frontend/pages/characters.js
+python3 -c "import ast; ast.parse(open('api/models/character.py').read()); print('OK')"
 
 # Generar JWT secret
 python -c "import secrets; print(secrets.token_hex(32))"

@@ -951,11 +951,12 @@ export async function render(container) {
     }
 
     const BACKGROUNDS = ['Acólito','Artesano Gremial','Criminal','Ermitaño','Forajido','Héroe Popular','Marinero','Mercader','Militar','Noble','Sabio','Siervo'];
-    const ALIGNMENTS = ['lawful_good','neutral_good','chaotic_good','lawful_neutral','true_neutral','chaotic_neutral','lawful_evil','neutral_evil','chaotic_evil'];
+    // DB enum values for alignment_type
+    const ALIGNMENTS = ['LG','NG','CG','LN','TN','CN','LE','NE','CE'];
     const ALIGNMENT_LABELS = {
-      lawful_good:'Legal Bueno', neutral_good:'Neutral Bueno', chaotic_good:'Caótico Bueno',
-      lawful_neutral:'Legal Neutral', true_neutral:'Neutral', chaotic_neutral:'Caótico Neutral',
-      lawful_evil:'Legal Malvado', neutral_evil:'Neutral Malvado', chaotic_evil:'Caótico Malvado',
+      LG:'Legal Bueno', NG:'Neutral Bueno', CG:'Caótico Bueno',
+      LN:'Legal Neutral', TN:'Neutral', CN:'Caótico Neutral',
+      LE:'Legal Malvado', NE:'Neutral Malvado', CE:'Caótico Malvado',
     };
     const campOptions = [
       { value: '', label: '— Sin campaña —' },
