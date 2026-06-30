@@ -180,6 +180,15 @@ async def update_character(
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
 
+    # Normalizar alignment: acepta tanto abreviaciones (LG) como nombres completos (lawful_good)
+    _alignment_map = {
+        "lawful_good": "LG", "neutral_good": "NG", "chaotic_good": "CG",
+        "lawful_neutral": "LN", "true_neutral": "TN", "chaotic_neutral": "CN",
+        "lawful_evil": "LE", "neutral_evil": "NE", "chaotic_evil": "CE",
+    }
+    if updates.get("alignment"):
+        updates["alignment"] = _alignment_map.get(updates["alignment"], updates["alignment"])
+
     # Map field names to column names
     col_map = {
         "char_class": "class",
