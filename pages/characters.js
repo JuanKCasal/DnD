@@ -80,6 +80,49 @@ const CLASS_HIT_DIE = {
 /* BPC = floor((nivel-1)/4) + 2  →  +2(N1-4), +3(N5-8), +4(N9-12), +5(N13-16), +6(N17-20) */
 function profBonusByLevel(lvl) { return Math.floor((lvl - 1) / 4) + 2; }
 
+/* ─── Claves de salvación por Clase — claves DB (PHB) ──────────────── */
+const CLASS_SAVES_KEYS = {
+  'Bárbaro':['str','con'],'Bardo':['dex','cha'],'Clérigo':['wis','cha'],
+  'Druida':['int','wis'],'Guerrero':['str','con'],'Monje':['str','dex'],
+  'Paladín':['wis','cha'],'Explorador':['str','dex'],'Pícaro':['dex','int'],
+  'Hechicero':['con','cha'],'Brujo':['wis','cha'],'Mago':['int','wis'],
+};
+
+/* ─── Habilidades fijas por Raza (PHB) ──────────────────────────────── */
+const RACE_SKILLS = {
+  'Elfo':    ['perception'],
+  'Semiorco':['intimidation'],
+};
+
+/* ─── Nombre español → clave DB ─────────────────────────────────────── */
+const SKILL_NAME_TO_KEY = {
+  'Acrobacias':'acrobatics','Trato con Animales':'animal_handling','Arcanos':'arcana',
+  'Atletismo':'athletics','Engaño':'deception','Historia':'history',
+  'Perspicacia':'insight','Intimidación':'intimidation','Investigación':'investigation',
+  'Medicina':'medicine','Naturaleza':'nature','Percepción':'perception',
+  'Actuación':'performance','Persuasión':'persuasion','Religión':'religion',
+  'Juego de Manos':'sleight_of_hand','Sigilo':'stealth','Supervivencia':'survival',
+};
+
+/* ─── Clave DB → Nombre español ─────────────────────────────────────── */
+const SKILL_KEY_TO_NAME = Object.fromEntries(Object.entries(SKILL_NAME_TO_KEY).map(([n,k]) => [k,n]));
+
+/* ─── Competencias de habilidad por Clase (PHB 2014) ────────────────── */
+const CLASS_SKILLS = {
+  'Bárbaro':   { count:2, options:['animal_handling','athletics','intimidation','nature','perception','survival'] },
+  'Bardo':     { count:3, options:['acrobatics','animal_handling','arcana','athletics','deception','history','insight','intimidation','investigation','medicine','nature','perception','performance','persuasion','religion','sleight_of_hand','stealth','survival'] },
+  'Clérigo':   { count:2, options:['history','insight','medicine','persuasion','religion'] },
+  'Druida':    { count:2, options:['arcana','animal_handling','insight','medicine','nature','perception','religion','survival'] },
+  'Guerrero':  { count:2, options:['acrobatics','animal_handling','athletics','history','insight','intimidation','perception','survival'] },
+  'Monje':     { count:2, options:['acrobatics','athletics','history','insight','religion','stealth'] },
+  'Paladín':   { count:2, options:['athletics','insight','intimidation','medicine','persuasion','religion'] },
+  'Explorador':{ count:3, options:['animal_handling','athletics','insight','investigation','nature','perception','stealth','survival'] },
+  'Pícaro':    { count:4, options:['acrobatics','athletics','deception','insight','intimidation','investigation','sleight_of_hand','perception','performance','persuasion','stealth'] },
+  'Hechicero': { count:2, options:['arcana','deception','insight','intimidation','persuasion','religion'] },
+  'Brujo':     { count:2, options:['arcana','deception','history','intimidation','nature','religion'] },
+  'Mago':      { count:2, options:['arcana','history','insight','investigation','medicine','religion'] },
+};
+
 /* ─── MAIN RENDER ───────────────────────────────────────────────── */
 export async function render(container) {
   container.innerHTML = '';
@@ -691,7 +734,8 @@ export async function render(container) {
     SAVE_MAP.forEach(s => {
       const base      = mod(c[s.scoreKey] ?? 10);
       const info      = saves_data[s.key] ?? {};
-      const proficient= !!(info.proficient || info.expert);
+      const classSaveKeys = CLASS_SAVES_KEYS[c.char_class] ?? [];
+      const proficient= !!(info.proficient || info.expert) || classSaveKeys.includes(s.key);
       const bonus     = base + (proficient ? prof : 0);
       const bonusStr  = (bonus >= 0 ? '+' : '') + bonus;
       const row       = document.createElement('div');
@@ -1206,6 +1250,114 @@ export async function render(container) {
     });
     form.appendChild(statsGrid);
 
+    /* ── SECCIÓN: Competencias de Habilidad ── */
+    form.appendChild(sectionHeader('Competencias de Habilidad'));
+
+    // Parser local (safeJson está en otro scope)
+    const pj = (v, d) => { try { return typeof v === 'string' ? JSON.parse(v) : (v ?? d); } catch (_) { return d; } };
+    const existingSkillData = pj(e.skills, {});
+    let lockedSkillKeys = new Set();
+
+    const mkSkillBadge = txt => {
+      const b = document.createElement('span');
+      b.style.cssText = 'display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:4px;font-size:11px;font-family:var(--font-ui);background:rgba(122,92,10,0.1);border:1px solid var(--gold-dim);color:var(--gold);';
+      b.textContent = '🔒 ' + txt;
+      return b;
+    };
+
+    // Grupo Trasfondo
+    const bgSkillLbl = document.createElement('div');
+    bgSkillLbl.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-muted);margin-bottom:5px;margin-top:4px;';
+    bgSkillLbl.textContent = 'Trasfondo';
+    const bgSkillBadges = document.createElement('div');
+    bgSkillBadges.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;min-height:20px;margin-bottom:10px;';
+
+    // Grupo Especie
+    const raceSkillLbl = document.createElement('div');
+    raceSkillLbl.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-muted);margin-bottom:5px;';
+    raceSkillLbl.textContent = 'Especie / Raza';
+    const raceSkillBadges = document.createElement('div');
+    raceSkillBadges.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;min-height:20px;margin-bottom:10px;';
+
+    // Grupo Clase
+    const clsSkillHdr = document.createElement('div');
+    clsSkillHdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;';
+    const clsSkillLbl = document.createElement('div');
+    clsSkillLbl.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-muted);';
+    clsSkillLbl.textContent = 'Clase (elección del jugador)';
+    const clsSkillCounter = document.createElement('div');
+    clsSkillCounter.style.cssText = 'font-size:11px;font-family:var(--font-mono);color:var(--gold);';
+    clsSkillHdr.appendChild(clsSkillLbl);
+    clsSkillHdr.appendChild(clsSkillCounter);
+    const clsSkillGrid = document.createElement('div');
+    clsSkillGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:4px;';
+
+    const skillSection = document.createElement('div');
+    skillSection.appendChild(bgSkillLbl);
+    skillSection.appendChild(bgSkillBadges);
+    skillSection.appendChild(raceSkillLbl);
+    skillSection.appendChild(raceSkillBadges);
+    skillSection.appendChild(clsSkillHdr);
+    skillSection.appendChild(clsSkillGrid);
+    form.appendChild(skillSection);
+
+    function updateBgSkillComp(bg) {
+      bgSkillBadges.innerHTML = '';
+      (BACKGROUND_SKILLS[bg] ?? []).forEach(name => {
+        const key = SKILL_NAME_TO_KEY[name];
+        if (key) lockedSkillKeys.add(key);
+        bgSkillBadges.appendChild(mkSkillBadge(name));
+      });
+    }
+    function updateRaceSkillComp(race) {
+      raceSkillBadges.innerHTML = '';
+      (RACE_SKILLS[race] ?? []).forEach(k => {
+        lockedSkillKeys.add(k);
+        raceSkillBadges.appendChild(mkSkillBadge(SKILL_KEY_TO_NAME[k] ?? k));
+      });
+    }
+    function updateClsSkillComp(cls, savedSkills) {
+      clsSkillGrid.innerHTML = '';
+      clsSkillCounter.textContent = '';
+      const cfg = CLASS_SKILLS[cls];
+      if (!cfg) return;
+      const { count, options } = cfg;
+      const savedKeys = new Set(Object.keys(savedSkills ?? {}).filter(k => options.includes(k) && !lockedSkillKeys.has(k)));
+
+      const refreshCounter = () => {
+        const n = clsSkillGrid.querySelectorAll('input[type=checkbox]:checked').length;
+        clsSkillCounter.style.color = n > count ? 'var(--crimson)' : n === count ? 'var(--success)' : 'var(--gold)';
+        clsSkillCounter.textContent = n + '/' + count;
+      };
+
+      options.forEach(k => {
+        const isLocked  = lockedSkillKeys.has(k);
+        const label = document.createElement('label');
+        label.style.cssText = 'display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:6px;cursor:' + (isLocked ? 'default' : 'pointer') + ';border:1px solid var(--border);background:var(--stone-light);font-size:11px;color:' + (isLocked ? 'var(--ink-faint)' : 'var(--ink)') + ';user-select:none;';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.name = 'class-skill'; cb.value = k;
+        cb.checked = !isLocked && savedKeys.has(k);
+        cb.disabled = isLocked;
+        cb.style.accentColor = 'var(--gold)';
+        cb.addEventListener('change', () => {
+          const n = clsSkillGrid.querySelectorAll('input[type=checkbox]:checked').length;
+          if (n > count) { cb.checked = false; return; }
+          refreshCounter();
+        });
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(SKILL_KEY_TO_NAME[k] ?? k));
+        clsSkillGrid.appendChild(label);
+      });
+      refreshCounter();
+    }
+    function rebuildAllSkillComp() {
+      lockedSkillKeys = new Set();
+      updateBgSkillComp(form.querySelector('#f-background').value);
+      updateRaceSkillComp(form.querySelector('#f-race').value);
+      updateClsSkillComp(form.querySelector('#f-class').value, existingSkillData);
+    }
+    rebuildAllSkillComp();
+
     /* ── SECCIÓN: Personalidad ── */
     form.appendChild(sectionHeader('Personalidad & Historia'));
     form.appendChild(fRow('Rasgos de Personalidad', fTextarea('f-traits', 'Soy curioso y siempre hago preguntas…', e.personality_traits ?? '')));
@@ -1296,6 +1448,7 @@ export async function render(container) {
         form.querySelector('#f-speed').value = RACE_DATA[ev.target.value]?.speed ?? 30;
         recalcDerived();
       }
+      rebuildAllSkillComp();
     });
     form.querySelector('#f-subrace').addEventListener('change', () => {
       if (!isEdit) applyRaceBonuses();
@@ -1306,8 +1459,9 @@ export async function render(container) {
         recalcDerived();
       }
     });
-    form.querySelector('#f-class').addEventListener('change', () => recalcDerived());
+    form.querySelector('#f-class').addEventListener('change', () => { recalcDerived(); rebuildAllSkillComp(); });
     form.querySelector('#f-level').addEventListener('input',  () => recalcDerived());
+    form.querySelector('#f-background').addEventListener('change', () => rebuildAllSkillComp());
 
     if (!isEdit) recalcDerived();
 
@@ -1369,6 +1523,19 @@ export async function render(container) {
         backstory:          form.querySelector('#f-backstory').value || null,
         notes:              form.querySelector('#f-notes').value || null,
       };
+
+      // Tiradas de salvación — determinísticas por clase (PHB)
+      const payloadClass = form.querySelector('#f-class').value;
+      const classSavesList = CLASS_SAVES_KEYS[payloadClass] ?? [];
+      const saving_throws = {};
+      ['str','dex','con','int','wis','cha'].forEach(k => { saving_throws[k] = { proficient: classSavesList.includes(k) }; });
+      payload.saving_throws = saving_throws;
+
+      // Competencias de habilidad — trasfondo + raza (locked) + elección de clase
+      const skills = {};
+      lockedSkillKeys.forEach(k => { skills[k] = { proficient: true }; });
+      form.querySelectorAll('input[name="class-skill"]:checked').forEach(cb => { skills[cb.value] = { proficient: true }; });
+      payload.skills = skills;
 
       try {
         if (isEdit) {
