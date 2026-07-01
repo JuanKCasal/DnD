@@ -587,6 +587,41 @@ Rediseño integral del manejo de ítems (ver `PLAN_MEJORAS_ITEMS.md`).
 
 ---
 
+## Sistema de Hechizos — Fases H1–H6 (ver PLAN_MEJORAS_HECHIZOS.md)
+
+Sistema de magia D&D 5e: catálogo administrable + equipar/preparar hechizos por clase/nivel/disponibilidad. Alcance acordado: **pragmático**. Seed: **SRD completo (~319)**.
+
+### Fase H1 — Fundaciones de datos (backend) ✅ COMPLETADA
+- [x] Migración `db/migrations/004_spells.sql`: enum `spell_school` (8 escuelas), tabla `spells` (catálogo global, anatomía completa: nivel, escuela, tiempo/alcance, componentes V/S/M, duración, concentración, ritual, descripción, upcasting, resolución ataque/salvación/daño, `classes TEXT[]`, refs SRD), tabla `character_spells` (repertorio: `is_prepared`, `is_always_known`, `source`). Índice GIN en `classes`, único en `dnd5eapi_index`.
+- [x] `api/models/spell_model.py`: `SpellCreate/SpellUpdate/SpellOut` + `CharacterSpellAdd/CharacterSpellUpdate` con validadores (level 0–9, school, saving_throw ∈ {STR..CHA} normalizado a mayúsculas, classes ⊆ set canónico, source).
+- [x] `api/routers/spells.py`: CRUD del catálogo `/api/v1/spells` — GET lista (filtros `search`, `level`, `school`, `class`, `ritual`, `concentration`), GET id, POST/PUT/DELETE **admin-only**. Cast `::spell_school`, `helpers.py`, `log_event`.
+- [x] Router registrado en `api/main.py`.
+- [x] `db/migrate_spells_known.py`: migración de datos (casa `spells_known`/`cantrips_known` existentes contra el catálogo → `character_spells`, idempotente). **Ejecutar DESPUÉS del seed de H2.**
+
+**Claves canónicas de clase** (en `classes`): `bard, cleric, druid, paladin, ranger, sorcerer, warlock, wizard, eldritch_knight, arcane_trickster`. La ficha mapea el `class` en español a estas claves (pendiente H5).
+
+**Nota de datos:** `characters.spells_known` (JSONB) y `cantrips_known` (TEXT[]) quedan como **respaldo deprecado**; se eliminan en H6 tras validar la migración. `spell_slots` y `pact_magic` se conservan (estado de recursos).
+
+**⚠️ PENDIENTE DE DESPLIEGUE (H1):**
+```powershell
+# 1. Aplicar migración (desde PowerShell o Railway)
+python db/migrate.py 004_spells
+# 2. (Tras seed de H2) migrar datos existentes
+python db/migrate_spells_known.py
+# 3. Commit
+git add db/migrations/004_spells.sql db/migrate_spells_known.py api/models/spell_model.py api/routers/spells.py api/main.py CLAUDE.md PLAN_MEJORAS_HECHIZOS.md
+git commit -m "feat: H1 sistema de hechizos — schema, modelo, router CRUD catálogo"
+git push origin main
+```
+
+### Fase H2 — Seed SRD completo + validación (pendiente)
+### Fase H3 — Catálogo en menú Configuración (pendiente)
+### Fase H4 — Servicio de conjuración + cálculos (pendiente)
+### Fase H5 — Equipar/preparar hechizos en la ficha (pendiente)
+### Fase H6 — Refinamientos mecánicos + limpieza (pendiente)
+
+---
+
 ## Próximas Fases (Pendiente)
 
 ### Fase 8 — Chat y Comunidad en tiempo real
