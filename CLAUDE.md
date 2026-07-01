@@ -404,6 +404,13 @@ En los SELECT se usan aliases: `c.str AS str_score`, etc. El router incluye `_ch
 - Commits: `feat:` `fix:` `db:` `style:` `docs:` `test:`
 - **Lock files:** Git lock desde el sandbox tiene permisos limitados — si falla, el usuario debe hacer commit/push desde PowerShell en Windows
 
+### Entorno local (Windows) — comandos de referencia
+- **Python (usar SIEMPRE esta ruta en PowerShell):** `C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe`
+  - Ej. migración: `C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 004_spells`
+  - Ej. seed: `C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/seed_spells.py`
+- **Git add + commit + push (una sola línea, sin saltos ni backticks):**
+  - `git add -A; git commit -m "mensaje"; git push origin main`
+
 ---
 
 ## Conexiones Aiven — Patrones de código
@@ -614,7 +621,17 @@ git commit -m "feat: H1 sistema de hechizos — schema, modelo, router CRUD cat�
 git push origin main
 ```
 
-### Fase H2 — Seed SRD completo + validación (pendiente)
+### Fase H2 — Seed SRD completo + validación ✅ COMPLETADA (pendiente de ejecutar)
+- [x] `db/seed_spells.py`: seeder idempotente (índice único `dnd5eapi_index` + `ON CONFLICT DO UPDATE`). Descarga la SRD 5.1 (OGL) una vez desde 5e-bits/dnd5eapi y la **cachea versionada** en `db/data/srd_spells.json` (Railway y re-ejecuciones NO requieren red). Modos `--dry-run` (QA sin BD) y `--refresh` (re-descarga).
+- [x] `transform_spell()` (función pura): mapea el esquema dnd5eapi → columnas de `spells` (componentes V/S/M, tipo de tiempo/alcance derivados, `range_feet`, daño base por nivel/nivel-de-personaje, salvación, `requires_attack_roll` desde `attack_type`, clases filtradas al set canónico). Verificado con fireball / fire-bolt / detect-magic.
+- [x] Nombres en **español** para el núcleo icónico (`SPANISH_NAMES`, ~90 hechizos); el resto usa el nombre inglés (`name_en` siempre poblado). Todo editable en el catálogo admin (H3).
+- [x] `report()`: QA de conteos por nivel/escuela/clase, duplicados y enums inválidos.
+
+**Nota de idioma:** las descripciones son el texto oficial SRD (inglés, OGL). Traducción de descripciones = pasada futura / edición manual en H3.
+
+**⚠️ PENDIENTE DE DESPLIEGUE (H2) — desde PowerShell:**
+`C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/seed_spells.py --dry-run` (revisar conteos) y luego `C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/seed_spells.py` (siembra). Después correr `db/migrate_spells_known.py` (migra repertorios existentes) y commitear también `db/data/srd_spells.json`.
+
 ### Fase H3 — Catálogo en menú Configuración (pendiente)
 ### Fase H4 — Servicio de conjuración + cálculos (pendiente)
 ### Fase H5 — Equipar/preparar hechizos en la ficha (pendiente)
