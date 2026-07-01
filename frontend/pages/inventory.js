@@ -285,8 +285,10 @@ export async function render(container) {
     const typeSelect = buildSelect([
       ['', 'Todos los tipos'],
       ['weapon','⚔️ Arma'],['armor','🛡️ Armadura'],['potion','🧪 Poción'],
-      ['spell_scroll','📜 Pergamino'],['ring','💍 Anillo'],['wondrous','🌟 Maravilloso'],
-      ['tool','🔧 Herramienta'],['gear','🎒 Equipo'],['treasure','💎 Tesoro'],['other','📦 Otro'],
+      ['spell_scroll','📜 Pergamino'],['ring','💍 Anillo'],['rod','🔱 Vara'],
+      ['staff','🪄 Bastón'],['wand','✨ Varita'],['wondrous','🌟 Maravilloso'],
+      ['tool','🔧 Herramienta'],['ammunition','🏹 Munición'],['gear','🎒 Equipo'],
+      ['treasure','💎 Tesoro'],['vehicle','🚗 Vehículo'],['other','📦 Otro'],
     ]);
 
     const raritySelect = buildSelect([
@@ -304,7 +306,7 @@ export async function render(container) {
       createBtn.className = 'btn btn-primary';
       createBtn.style.cssText = 'display:flex;align-items:center;gap:6px;white-space:nowrap;';
       createBtn.innerHTML = '<span style="font-size:16px;">+</span> Nuevo item';
-      createBtn.addEventListener('click', () => openCreateItemModal(catalogueEl));
+      createBtn.addEventListener('click', () => openItemModal('create', null, catalogueEl));
       controls.appendChild(createBtn);
     }
 
@@ -350,7 +352,7 @@ export async function render(container) {
       grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;';
 
       items.forEach((item, i) => {
-        grid.appendChild(buildCatalogueCard(item, i));
+        grid.appendChild(buildCatalogueCard(item, i, el));
       });
       el.appendChild(grid);
     } catch (err) {
@@ -494,14 +496,14 @@ export async function render(container) {
     return row;
   }
 
-  function buildCatalogueCard(item, index) {
+  function buildCatalogueCard(item, index, catalogueEl) {
     const r = RARITY[item.rarity] || RARITY.common;
     const icon = TYPE_ICON[item.type] || '📦';
 
     const card = document.createElement('div');
     card.style.cssText = `
       background:var(--stone);border:1px solid var(--border);border-radius:10px;
-      padding:16px;cursor:default;position:relative;overflow:hidden;
+      padding:16px;cursor:pointer;position:relative;overflow:hidden;
       animation:fadeSlideIn var(--dur-slow) var(--ease-out-expo) ${index * 20}ms both;
       transition:transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast);
       border-top:2px solid ${r.color}66;
@@ -514,6 +516,7 @@ export async function render(container) {
       card.style.transform = '';
       card.style.boxShadow = '';
     });
+    card.addEventListener('click', () => openItemDetailModal(item, catalogueEl));
 
     const head = document.createElement('div');
     head.style.cssText = 'display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;';
@@ -553,6 +556,21 @@ export async function render(container) {
     card.appendChild(badges);
 
     if (canManage) {
+      const editBtn = document.createElement('button');
+      editBtn.style.cssText = `
+        position:absolute;top:8px;right:34px;
+        padding:3px 8px;border-radius:4px;font-size:10px;cursor:pointer;
+        background:var(--gold-glow);color:var(--gold);
+        border:1px solid var(--gold-dim)44;
+      `;
+      editBtn.textContent = '✎';
+      editBtn.title = 'Editar item';
+      editBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        openItemModal('edit', item, catalogueEl);
+      });
+      card.appendChild(editBtn);
+
       const delBtn = document.createElement('button');
       delBtn.style.cssText = `
         position:absolute;top:8px;right:8px;
@@ -695,76 +713,176 @@ export async function render(container) {
   }
 
   /* ═══════════════════════════════════════════════════════════════
-     MODAL: Crear nuevo item en el catálogo
+     Opciones de selects mecánicos
   ═══════════════════════════════════════════════════════════════ */
-  function openCreateItemModal(catalogueEl) {
-    const overlay = buildOverlay();
-    const modal = buildModal('Nuevo item');
+  const OPT_WEAPON_CAT = [['', '—'], ['Simple', 'Simple'], ['Martial', 'Marcial']];
+  const OPT_RANGE_TYPE = [['', '—'], ['Melee', 'Cuerpo a cuerpo'], ['Ranged', 'A distancia']];
+  const OPT_DAMAGE_TYPE = [['', '—'], ['bludgeoning', 'Contundente'], ['piercing', 'Perforante'], ['slashing', 'Cortante']];
+  const OPT_ARMOR_CAT = [['', '—'], ['Light', 'Ligera'], ['Medium', 'Media'], ['Heavy', 'Pesada'], ['Shield', 'Escudo']];
 
-    const fields = [
-      { label: 'NOMBRE *', key: 'name', type: 'text', required: true },
-      { label: 'DESCRIPCIÓN', key: 'description', type: 'textarea' },
-      { label: 'TIPO', key: 'type', type: 'select', options: Object.keys(TYPE_ICON).map(k => [k, `${TYPE_ICON[k]} ${k}`]) },
-      { label: 'RAREZA', key: 'rarity', type: 'select', options: Object.entries(RARITY).map(([k, v]) => [k, v.label]) },
-      { label: 'PESO (lb)', key: 'weight', type: 'number' },
-      { label: 'VALOR (PO)', key: 'value_gp', type: 'number' },
-      { label: 'FUENTE (libro)', key: 'source_book', type: 'text' },
-    ];
+  const CHARGE_TYPES = ['potion', 'spell_scroll', 'wand', 'staff', 'rod', 'ring', 'wondrous'];
 
-    const values = {};
-    fields.forEach(f => {
-      const wrap = document.createElement('div');
-      wrap.style.cssText = 'margin-bottom:12px;';
-      const label = document.createElement('label');
-      label.style.cssText = 'display:block;margin-bottom:5px;font-size:11px;color:var(--ink-muted);font-weight:600;letter-spacing:0.05em;';
-      label.textContent = f.label;
-      wrap.appendChild(label);
+  function _fieldWrap(labelText) {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'margin-bottom:12px;';
+    const label = document.createElement('label');
+    label.style.cssText = 'display:block;margin-bottom:5px;font-size:11px;color:var(--ink-muted);font-weight:600;letter-spacing:0.05em;';
+    label.textContent = labelText;
+    wrap.appendChild(label);
+    return wrap;
+  }
 
-      let el;
-      if (f.type === 'textarea') {
-        el = document.createElement('textarea');
-        el.rows = 3;
-        el.style.resize = 'vertical';
-      } else if (f.type === 'select') {
-        el = document.createElement('select');
-        f.options.forEach(([val, lbl]) => {
-          const o = document.createElement('option');
-          o.value = val;
-          o.textContent = lbl;
-          el.appendChild(o);
-        });
-      } else {
-        el = document.createElement('input');
-        el.type = f.type;
-      }
-      applyInputStyle(el);
-      el.addEventListener('change', () => values[f.key] = el.value);
-      el.addEventListener('input', () => values[f.key] = el.value);
-      values[f.key] = el.value || (f.type === 'select' ? f.options[0][0] : '');
-      wrap.appendChild(el);
-      modal.appendChild(wrap);
+  function _bindInput(values, key, el, kind) {
+    const set = () => {
+      values[key] = kind === 'checkbox' ? el.checked : el.value;
+    };
+    el.addEventListener('change', set);
+    el.addEventListener('input', set);
+  }
+
+  function _textField(values, key, labelText, kind = 'text') {
+    const wrap = _fieldWrap(labelText);
+    const el = kind === 'textarea' ? document.createElement('textarea') : document.createElement('input');
+    if (kind === 'textarea') { el.rows = 3; el.style.resize = 'vertical'; }
+    else el.type = kind === 'number' ? 'number' : 'text';
+    applyInputStyle(el);
+    const cur = values[key];
+    if (cur !== undefined && cur !== null) el.value = cur;
+    _bindInput(values, key, el);
+    wrap.appendChild(el);
+    return wrap;
+  }
+
+  function _selectField(values, key, labelText, options) {
+    const wrap = _fieldWrap(labelText);
+    const el = document.createElement('select');
+    options.forEach(([val, lbl]) => {
+      const o = document.createElement('option');
+      o.value = val; o.textContent = lbl;
+      el.appendChild(o);
     });
+    applyInputStyle(el);
+    if (values[key] !== undefined && values[key] !== null) el.value = values[key];
+    _bindInput(values, key, el);
+    return { wrap, el };
+  }
 
-    const checkRow = document.createElement('div');
-    checkRow.style.cssText = 'display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;';
-    [['is_magical','✨ Mágico'],['is_consumable','⚡ Consumible'],['requires_attunement','🔮 Sintonía']].forEach(([key, lbl]) => {
+  function _checkRow(values, defs) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;';
+    defs.forEach(([key, lbl, onChange]) => {
       const label = document.createElement('label');
       label.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);cursor:pointer;';
       const chk = document.createElement('input');
       chk.type = 'checkbox';
       chk.style.accentColor = 'var(--gold)';
-      chk.addEventListener('change', () => values[key] = chk.checked);
-      values[key] = false;
+      chk.checked = !!values[key];
+      chk.addEventListener('change', () => { values[key] = chk.checked; if (onChange) onChange(); });
       label.appendChild(chk);
       label.appendChild(document.createTextNode(lbl));
-      checkRow.appendChild(label);
+      row.appendChild(label);
     });
-    modal.appendChild(checkRow);
+    return row;
+  }
 
+  /* ═══════════════════════════════════════════════════════════════
+     MODAL: Crear / Editar item (campos condicionales por tipo)
+  ═══════════════════════════════════════════════════════════════ */
+  async function openItemModal(mode, item, catalogueEl) {
+    const isEdit = mode === 'edit';
+    const overlay = buildOverlay();
+    const modal = buildModal(isEdit ? 'Editar item' : 'Nuevo item');
+
+    const values = {
+      name: '', description: '', type: 'other', rarity: 'common',
+      weight: '', value_gp: '', source_book: '',
+      is_magical: false, is_consumable: false, requires_attunement: false,
+      attunement_restriction: '', charges_max: '',
+      weapon_category: '', weapon_range_type: '', damage_dice: '', damage_type: '',
+      damage_dice_versatile: '', weapon_properties: '',
+      armor_category: '', ac_base: '', ac_dex_bonus: false, ac_max_dex_bonus: '',
+      str_minimum: '', stealth_disadvantage: false, bonus_ac: '',
+    };
+
+    // Prefill en edición (obtiene el item completo, incl. campos mecánicos)
+    if (isEdit && item) {
+      let full = item;
+      try { full = (await api.get(`/items/${item.id}`)).data; } catch (_) {}
+      Object.keys(values).forEach(k => {
+        let v = full[k];
+        if (v === null || v === undefined) return;
+        if (k === 'weapon_properties' && Array.isArray(v)) v = v.join(', ');
+        values[k] = v;
+      });
+    }
+
+    // ── Campos base ──
+    modal.appendChild(_textField(values, 'name', 'NOMBRE *'));
+    modal.appendChild(_textField(values, 'description', 'DESCRIPCIÓN', 'textarea'));
+    const typeSel = _selectField(values, 'type', 'TIPO',
+      Object.keys(TYPE_ICON).map(k => [k, `${TYPE_ICON[k]} ${k}`]));
+    modal.appendChild(typeSel.wrap);
+    modal.appendChild(_selectField(values, 'rarity', 'RAREZA',
+      Object.entries(RARITY).map(([k, v]) => [k, v.label])).wrap);
+    modal.appendChild(_textField(values, 'weight', 'PESO (lb)', 'number'));
+    modal.appendChild(_textField(values, 'value_gp', 'VALOR (PO)', 'number'));
+    modal.appendChild(_textField(values, 'source_book', 'FUENTE (libro)'));
+
+    // ── Flags ──
+    modal.appendChild(_checkRow(values, [
+      ['is_magical', '✨ Mágico', () => renderMechanical()],
+      ['is_consumable', '⚡ Consumible'],
+      ['requires_attunement', '🔮 Sintonía', () => renderMechanical()],
+    ]));
+
+    // ── Sección mecánica condicional ──
+    const mech = document.createElement('div');
+    modal.appendChild(mech);
+
+    function sectionTitle(txt) {
+      const h = document.createElement('div');
+      h.style.cssText = 'font-family:var(--font-ui);font-size:11px;font-weight:700;color:var(--gold);letter-spacing:0.08em;text-transform:uppercase;margin:4px 0 10px;';
+      h.textContent = txt;
+      return h;
+    }
+
+    function renderMechanical() {
+      mech.innerHTML = '';
+      const t = values.type;
+      if (t === 'weapon') {
+        mech.appendChild(sectionTitle('⚔️ Propiedades de arma'));
+        mech.appendChild(_selectField(values, 'weapon_category', 'CATEGORÍA', OPT_WEAPON_CAT).wrap);
+        mech.appendChild(_selectField(values, 'weapon_range_type', 'ALCANCE', OPT_RANGE_TYPE).wrap);
+        mech.appendChild(_textField(values, 'damage_dice', 'DADO DE DAÑO (ej: 1d8)'));
+        mech.appendChild(_selectField(values, 'damage_type', 'TIPO DE DAÑO', OPT_DAMAGE_TYPE).wrap);
+        mech.appendChild(_textField(values, 'damage_dice_versatile', 'DAÑO VERSÁTIL (ej: 1d10)'));
+        mech.appendChild(_textField(values, 'weapon_properties', 'PROPIEDADES (separadas por coma)'));
+      } else if (t === 'armor') {
+        mech.appendChild(sectionTitle('🛡️ Propiedades de armadura'));
+        mech.appendChild(_selectField(values, 'armor_category', 'CATEGORÍA', OPT_ARMOR_CAT).wrap);
+        mech.appendChild(_textField(values, 'ac_base', 'CA BASE', 'number'));
+        mech.appendChild(_textField(values, 'ac_max_dex_bonus', 'MÁX. BONUS DES (vacío = sin límite)', 'number'));
+        mech.appendChild(_textField(values, 'str_minimum', 'FUE MÍNIMA', 'number'));
+        mech.appendChild(_textField(values, 'bonus_ac', 'BONUS CA (escudos / mágico)', 'number'));
+        mech.appendChild(_checkRow(values, [
+          ['ac_dex_bonus', 'Suma DES a la CA'],
+          ['stealth_disadvantage', 'Desventaja en Sigilo'],
+        ]));
+      }
+      if (values.is_magical || values.requires_attunement || CHARGE_TYPES.includes(t)) {
+        mech.appendChild(sectionTitle('🔮 Mágico / cargas'));
+        mech.appendChild(_textField(values, 'charges_max', 'CARGAS MÁXIMAS', 'number'));
+        mech.appendChild(_textField(values, 'attunement_restriction', 'RESTRICCIÓN DE SINTONÍA'));
+      }
+    }
+    typeSel.el.addEventListener('change', renderMechanical);
+    renderMechanical();
+
+    // ── Footer ──
     const footer = document.createElement('div');
-    footer.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;';
+    footer.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;margin-top:8px;';
     const cancelBtn = buildBtn('Cancelar', false);
-    const saveBtn = buildBtn('Crear item', true);
+    const saveBtn = buildBtn(isEdit ? 'Guardar cambios' : 'Crear item', true);
     footer.appendChild(cancelBtn);
     footer.appendChild(saveBtn);
     modal.appendChild(footer);
@@ -774,18 +892,17 @@ export async function render(container) {
     overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
 
     saveBtn.addEventListener('click', async () => {
-      if (!values.name?.trim()) { toast.error('El nombre es requerido'); return; }
+      if (!String(values.name).trim()) { toast.error('El nombre es requerido'); return; }
       saveBtn.disabled = true;
       try {
-        const body = { ...values };
-        if (!body.weight) delete body.weight;
-        if (!body.value_gp) delete body.value_gp;
-        if (!body.source_book) delete body.source_book;
-        if (!body.description) delete body.description;
-        if (body.weight) body.weight = parseFloat(body.weight);
-        if (body.value_gp) body.value_gp = parseFloat(body.value_gp);
-        await api.post('/items', body);
-        toast.success(`"${body.name}" creado`);
+        const body = _buildItemPayload(values);
+        if (isEdit) {
+          await api.put(`/items/${item.id}`, body);
+          toast.success(`"${body.name || item.name}" actualizado`);
+        } else {
+          await api.post('/items', body);
+          toast.success(`"${body.name}" creado`);
+        }
         close();
         loadCatalogue(catalogueEl, '', '', '');
       } catch (e) { toast.error(e.message); saveBtn.disabled = false; }
@@ -793,6 +910,109 @@ export async function render(container) {
 
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
+  }
+
+  // Convierte el estado del formulario en el body para la API
+  function _buildItemPayload(values) {
+    const numeric = ['weight', 'value_gp', 'charges_max', 'ac_base', 'ac_max_dex_bonus', 'str_minimum', 'bonus_ac'];
+    const body = {};
+    Object.entries(values).forEach(([k, v]) => {
+      if (typeof v === 'boolean') { body[k] = v; return; }
+      const s = String(v).trim();
+      if (s === '') return;                       // omitir vacíos
+      if (k === 'weapon_properties') {
+        body[k] = s.split(',').map(x => x.trim()).filter(Boolean);
+      } else if (numeric.includes(k)) {
+        const n = parseFloat(s);
+        if (!Number.isNaN(n)) body[k] = n;
+      } else {
+        body[k] = v;
+      }
+    });
+    return body;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     MODAL: Detalle de item (solo lectura + acciones si canManage)
+  ═══════════════════════════════════════════════════════════════ */
+  async function openItemDetailModal(item, catalogueEl) {
+    const overlay = buildOverlay();
+    const modal = buildModal(item.name);
+    modal.appendChild(document.createTextNode(''));
+
+    const body = document.createElement('div');
+    body.innerHTML = '<div style="color:var(--ink-muted);font-size:13px;">Cargando...</div>';
+    modal.appendChild(body);
+
+    const footer = document.createElement('div');
+    footer.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;margin-top:18px;';
+    const closeBtn = buildBtn('Cerrar', false);
+    footer.appendChild(closeBtn);
+    const close = () => overlay.remove();
+    closeBtn.addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+    if (canManage) {
+      const editBtn = buildBtn('Editar', true);
+      editBtn.addEventListener('click', () => { close(); openItemModal('edit', item, catalogueEl); });
+      footer.appendChild(editBtn);
+    }
+    modal.appendChild(footer);
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    let it = item;
+    try { it = (await api.get(`/items/${item.id}`)).data; } catch (_) {}
+
+    const r = RARITY[it.rarity] || RARITY.common;
+    const rows = [];
+    const add = (k, v) => { if (v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && !v.length)) rows.push([k, v]); };
+
+    add('Tipo', `${TYPE_ICON[it.type] || '📦'} ${it.type}`);
+    add('Rareza', r.label);
+    add('Peso', it.weight != null ? `${it.weight} lb` : null);
+    add('Valor', it.value_gp != null ? `${it.value_gp} PO` : null);
+    if (it.type === 'weapon') {
+      add('Categoría', it.weapon_category);
+      add('Alcance', it.weapon_range_type === 'Ranged' ? 'A distancia' : (it.weapon_range_type === 'Melee' ? 'Cuerpo a cuerpo' : null));
+      add('Daño', it.damage_dice ? `${it.damage_dice} ${it.damage_type || ''}`.trim() : null);
+      add('Versátil', it.damage_dice_versatile);
+      if (it.range_normal) add('Rango', `${it.range_normal}/${it.range_long} ft`);
+      if (it.throw_range_normal) add('Arrojadiza', `${it.throw_range_normal}/${it.throw_range_long} ft`);
+      add('Propiedades', (it.weapon_properties || []).join(', '));
+    }
+    if (it.type === 'armor') {
+      add('Categoría', it.armor_category);
+      add('CA base', it.ac_base);
+      add('DES', it.ac_dex_bonus ? (it.ac_max_dex_bonus ? `+DES (máx ${it.ac_max_dex_bonus})` : '+DES') : 'sin DES');
+      add('FUE mínima', it.str_minimum || null);
+      add('Bonus CA', it.bonus_ac || null);
+      add('Sigilo', it.stealth_disadvantage ? 'Desventaja' : null);
+    }
+    add('Cargas', it.charges_max || null);
+    add('Sintonía', it.requires_attunement ? (it.attunement_restriction || 'Sí') : null);
+    add('Fuente', it.source_book);
+
+    body.innerHTML = '';
+    if (it.description) {
+      const d = document.createElement('p');
+      d.style.cssText = 'font-size:13px;color:var(--ink);line-height:1.55;margin:0 0 14px;';
+      d.textContent = it.description;
+      body.appendChild(d);
+    }
+    const grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px;';
+    rows.forEach(([k, v]) => {
+      const kEl = document.createElement('div');
+      kEl.style.cssText = 'color:var(--ink-muted);font-weight:600;';
+      kEl.textContent = k;
+      const vEl = document.createElement('div');
+      vEl.style.cssText = 'color:var(--ink);';
+      vEl.textContent = v;
+      grid.appendChild(kEl); grid.appendChild(vEl);
+    });
+    body.appendChild(grid);
   }
 
   /* ═══════════════════════════════════════════════════════════════
