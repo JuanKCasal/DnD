@@ -403,7 +403,7 @@ for bonus, rar in [(1, "uncommon"), (2, "rare"), (3, "very_rare")]:
     add(name=f"Arma +{bonus}", dnd5eapi_index=f"weapon-plus-{bonus}", type="weapon", rarity=rar,
         description=f"Bonificador +{bonus} a las tiradas de ataque y daño con esta arma mágica.",
         weight=0, value_gp=None, is_magical=True, source_book="DMG",
-        magical_properties={"bonus_attack": bonus, "bonus_damage": bonus})
+        magical_properties={"bonus_attack": bonus})
     add(name=f"Armadura +{bonus}", dnd5eapi_index=f"armor-plus-{bonus}", type="armor", rarity=rar,
         description=f"Bonificador +{bonus} a la CA mientras se lleva esta armadura mágica.",
         weight=0, value_gp=None, is_magical=True, source_book="DMG",
@@ -414,9 +414,9 @@ _MAGIC = [
     ("Lengua de fuego", "flame-tongue", "weapon", "rare", True,
      "Espada que puede prender en llamas: +2d6 de daño de fuego al activarla.", {"bonus_damage_extra": "2d6 fuego"}),
     ("Espada solar", "sun-blade", "weapon", "rare", True,
-     "+2 ataque y daño; +1d8 contra no-muertos; emite luz solar.", {"bonus_attack": 2, "bonus_damage": 2}),
+     "+2 ataque y daño; +1d8 contra no-muertos; emite luz solar.", {"bonus_attack": 2, "bonus_damage_extra": "1d8 radiante vs no-muertos"}),
     ("Daga del veneno", "dagger-of-venom", "weapon", "rare", False,
-     "+1 ataque y daño; 1×/día envenena (2d10 veneno, CD 15 CON).", {"bonus_attack": 1, "bonus_damage": 1}),
+     "+1 ataque y daño; 1×/día envenena (2d10 veneno, CD 15 CON).", {"bonus_attack": 1}),
     ("Armadura de mithral", "mithral-armor", "armor", "uncommon", False,
      "Sin desventaja en Sigilo ni requisito de FUE.", {"removes_stealth_disadvantage": True}),
     ("Armadura de adamantina", "adamantine-armor", "armor", "uncommon", False,

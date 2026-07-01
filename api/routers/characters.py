@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from api.dependencies import get_current_user, get_db
 from api.db.helpers import item_response, list_response, log_event, paginate, records_to_list
 from api.db.kafka import TOPIC_CHARACTERS_LEVELED_UP, TOPIC_INVENTORY_UPDATED, publish_event
+from api.services.character_mechanics import compute_combat
 from api.models.character import (
     CharacterCreate,
     CharacterUpdate,
@@ -325,6 +326,40 @@ async def update_spell_slots(
         json.dumps(body.spell_slots), char_id,
     )
     return item_response({"spell_slots": body.spell_slots})
+
+
+@router.get("/{char_id}/combat", response_model=dict)
+async def get_character_combat(
+    char_id: uuid.UUID,
+    conn: asyncpg.Connection = Depends(get_db),
+    _: dict = Depends(get_current_user),
+):
+    """Estadísticas de combate derivadas del equipo equipado (Fase I4)."""
+    char = await conn.fetchrow(
+        """
+        SELECT c.str AS str_score, c.dex AS dex_score, c.con AS con_score,
+               c.wis AS wis_score, c.speed, c.prof_bonus, c.level, c.ac, c.name
+        FROM characters c WHERE c.id = $1 AND c.active = TRUE
+        """,
+        char_id,
+    )
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found")
+
+    equipped = await conn.fetch(
+        """
+        SELECT ci.slot, ci.custom_name,
+               i.name, i.type, i.armor_category, i.ac_base, i.ac_dex_bonus,
+               i.ac_max_dex_bonus, i.str_minimum, i.stealth_disadvantage, i.bonus_ac,
+               i.damage_dice, i.damage_type, i.damage_dice_versatile,
+               i.weapon_range_type, i.weapon_properties, i.bonus_attack, i.magical_properties
+        FROM character_inventory ci JOIN items i ON i.id = ci.item_id
+        WHERE ci.character_id = $1 AND ci.equipped = TRUE
+        """,
+        char_id,
+    )
+    result = compute_combat(dict(char), [dict(r) for r in equipped])
+    return item_response(result)
 
 
 # NOTA (Fase I3): Los endpoints de inventario de personaje
