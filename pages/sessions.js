@@ -342,6 +342,7 @@ export async function render(container) {
       { id: 'chronicle', label: '📖 Crónica' },
       { id: 'highlights', label: '⭐ Highlights' },
       { id: 'attendance', label: '👥 Asistencia' },
+      { id: 'loot', label: '💎 Botín' },
     ];
 
     let activeTab = 'chronicle';
@@ -444,6 +445,184 @@ export async function render(container) {
           tabContent.innerHTML = '<div style="color:var(--crimson);padding:20px;">Error al cargar asistencia</div>';
         });
       }
+
+      if (id === 'loot') {
+        loadLoot();
+      }
+    }
+
+    const canManageLoot = !!(user && (user.role === 'admin' || (camp && String(camp.dm_id) === String(user.id))));
+
+    async function loadLoot() {
+      tabContent.innerHTML = '<div style="color:var(--ink-muted);padding:20px;">Cargando botín...</div>';
+      let loot = [], chars = [];
+      try {
+        const [lr, cr] = await Promise.all([
+          api.get(`/sessions/${session.id}/loot`),
+          canManageLoot ? api.get('/characters?per_page=200').catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+        ]);
+        loot = lr.data ?? [];
+        chars = (cr.data ?? []).filter(c => !camp || c.campaign_id === camp.id);
+      } catch (_) {
+        tabContent.innerHTML = '<div style="color:var(--crimson);padding:20px;">Error al cargar botín</div>';
+        return;
+      }
+      tabContent.innerHTML = '';
+
+      if (canManageLoot) {
+        const addBtn = document.createElement('button');
+        addBtn.className = 'btn btn-primary';
+        addBtn.style.cssText = 'margin-bottom:16px;';
+        addBtn.textContent = '+ Añadir botín';
+        addBtn.addEventListener('click', openAddLootModal);
+        tabContent.appendChild(addBtn);
+      }
+
+      if (!loot.length) {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'text-align:center;padding:40px;color:var(--ink-muted);';
+        empty.innerHTML = '<div style="font-size:32px;margin-bottom:12px;">💎</div><div>Sin botín registrado</div>';
+        tabContent.appendChild(empty);
+        return;
+      }
+
+      const list = document.createElement('div');
+      list.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
+      loot.forEach(it => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--stone-light);border:1px solid var(--border);border-radius:8px;';
+        const name = document.createElement('div');
+        name.style.cssText = 'flex:1;font-size:14px;color:var(--ink);';
+        name.textContent = `${it.item_name || it.catalog_name || 'Objeto'} ×${it.quantity}`;
+        row.appendChild(name);
+
+        if (it.awarded_to_name) {
+          const badge = document.createElement('span');
+          badge.style.cssText = 'font-size:12px;color:var(--success);white-space:nowrap;';
+          badge.textContent = '→ ' + it.awarded_to_name;
+          row.appendChild(badge);
+        } else if (canManageLoot) {
+          const sel = document.createElement('select');
+          applySelectStyle(sel);
+          sel.style.width = 'auto';
+          const optT = document.createElement('option');
+          optT.value = '__treasury__'; optT.textContent = '🏦 Tesoro';
+          sel.appendChild(optT);
+          chars.forEach(c => {
+            const o = document.createElement('option');
+            o.value = c.id; o.textContent = c.name;
+            sel.appendChild(o);
+          });
+          const give = document.createElement('button');
+          give.className = 'btn';
+          give.style.cssText = 'font-size:12px;white-space:nowrap;';
+          give.textContent = 'Otorgar';
+          give.addEventListener('click', async () => {
+            give.disabled = true;
+            const q = sel.value === '__treasury__' ? 'to_treasury=true' : `character_id=${sel.value}`;
+            try {
+              await api.post(`/sessions/${session.id}/loot/${it.id}/award?${q}`, {});
+              toast.success('Botín otorgado');
+              loadLoot();
+            } catch (e) { toast.error(e.message); give.disabled = false; }
+          });
+          row.appendChild(sel);
+          row.appendChild(give);
+        }
+
+        if (canManageLoot) {
+          const del = document.createElement('button');
+          del.style.cssText = 'padding:5px 9px;border-radius:6px;font-size:11px;cursor:pointer;background:var(--crimson-dim);color:var(--crimson);border:1px solid var(--crimson)33;';
+          del.textContent = '✕';
+          del.title = 'Eliminar botín';
+          del.addEventListener('click', async () => {
+            if (!confirm('¿Eliminar este botín?')) return;
+            try {
+              await api.del(`/sessions/${session.id}/loot/${it.id}`);
+              toast.success('Botín eliminado');
+              loadLoot();
+            } catch (e) { toast.error(e.message); }
+          });
+          row.appendChild(del);
+        }
+        list.appendChild(row);
+      });
+      tabContent.appendChild(list);
+    }
+
+    function openAddLootModal() {
+      const overlay = createOverlay();
+      const modal = document.createElement('div');
+      modal.style.cssText = 'background:var(--stone);border:1px solid var(--border);border-radius:14px;padding:24px;width:100%;max-width:460px;max-height:85vh;overflow-y:auto;';
+      const h = document.createElement('h3');
+      h.style.cssText = 'font-family:var(--font-display);font-size:18px;color:var(--gold);margin:0 0 16px;';
+      h.textContent = 'Añadir botín';
+      modal.appendChild(h);
+
+      const search = input('text', 'q', 'Buscar en catálogo...', '');
+      modal.appendChild(search);
+      const results = document.createElement('div');
+      results.style.cssText = 'max-height:200px;overflow-y:auto;margin:12px 0;border:1px solid var(--border);border-radius:8px;';
+      modal.appendChild(results);
+
+      let selected = null;
+      const qtyG = fieldGroup('Cantidad');
+      const qty = input('number', 'qty', '', '1');
+      qty.min = '1';
+      qtyG.appendChild(qty);
+      modal.appendChild(qtyG);
+
+      const footer = document.createElement('div');
+      footer.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;margin-top:16px;';
+      const cancel = document.createElement('button');
+      cancel.className = 'btn'; cancel.textContent = 'Cancelar';
+      cancel.addEventListener('click', () => closeOverlay(overlay));
+      const add = document.createElement('button');
+      add.className = 'btn btn-primary'; add.textContent = 'Añadir';
+      add.disabled = true; add.style.opacity = '0.5';
+      footer.appendChild(cancel); footer.appendChild(add);
+      modal.appendChild(footer);
+
+      let timer;
+      search.addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(async () => {
+          const q = search.value.trim();
+          if (q.length < 2) { results.innerHTML = '<div style="padding:16px;text-align:center;color:var(--ink-muted);font-size:12px;">Escribe 2+ caracteres</div>'; return; }
+          try {
+            const r = await api.get(`/items?search=${encodeURIComponent(q)}&per_page=20`);
+            results.innerHTML = '';
+            (r.data ?? []).forEach(item => {
+              const row = document.createElement('div');
+              row.style.cssText = 'padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;color:var(--ink);';
+              row.textContent = item.name;
+              row.addEventListener('click', () => {
+                selected = item;
+                results.querySelectorAll('div').forEach(d => d.style.background = '');
+                row.style.background = 'var(--gold-glow)';
+                add.disabled = false; add.style.opacity = '1';
+              });
+              results.appendChild(row);
+            });
+            if (!r.data?.length) results.innerHTML = '<div style="padding:16px;text-align:center;color:var(--ink-muted);font-size:12px;">Sin resultados</div>';
+          } catch (_) {}
+        }, 300);
+      });
+
+      add.addEventListener('click', async () => {
+        if (!selected) return;
+        add.disabled = true;
+        try {
+          await api.post(`/sessions/${session.id}/loot`, { item_id: selected.id, quantity: parseInt(qty.value) || 1 });
+          toast.success('Botín añadido');
+          closeOverlay(overlay);
+          loadLoot();
+        } catch (e) { toast.error(e.message); add.disabled = false; }
+      });
+
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+      setTimeout(() => search.focus(), 50);
     }
 
     tabs.forEach(t => {
