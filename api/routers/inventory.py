@@ -1,3 +1,4 @@
+import json
 import uuid
 
 import asyncpg
@@ -12,6 +13,58 @@ from api.models.inventory_model import (
 )
 
 router = APIRouter(prefix="/api/v1", tags=["inventory"])
+
+# ── Columnas y casts del catálogo de ítems ────────────────────────────
+# Proyección ligera para listados (sin magical_properties para evitar parseo por fila)
+ITEM_LIST_COLUMNS = """
+    id, name, description, type, rarity, weight, value_gp,
+    is_magical, is_consumable, requires_attunement, attunement_restriction,
+    charges_max, charges_recharge, sentient, cursed,
+    weapon_category, weapon_range_type, damage_dice, damage_type,
+    damage_dice_versatile, weapon_properties, bonus_attack,
+    armor_category, ac_base, ac_dex_bonus, ac_max_dex_bonus,
+    str_minimum, stealth_disadvantage, bonus_ac,
+    source_book, source_page
+"""
+
+# Proyección completa (incluye magical_properties y rangos) para detalle/escritura
+ITEM_FULL_COLUMNS = """
+    id, name, description, type, rarity, weight, value_gp,
+    is_magical, is_consumable, requires_attunement, attunement_restriction,
+    charges_max, charges_recharge, sentient, cursed,
+    weapon_category, weapon_range_type, damage_dice, damage_type, damage_dice_versatile,
+    range_normal, range_long, throw_range_normal, throw_range_long,
+    weapon_properties, bonus_attack,
+    armor_category, ac_base, ac_dex_bonus, ac_max_dex_bonus,
+    str_minimum, stealth_disadvantage, bonus_ac,
+    magical_properties, source_book, source_page, dnd5eapi_index, open5e_key
+"""
+
+# Campos que requieren cast explícito en INSERT/UPDATE
+ITEM_FIELD_CASTS = {
+    "type": "::item_type",
+    "rarity": "::item_rarity",
+    "magical_properties": "::jsonb",
+}
+
+
+def _serialize_item_field(field: str, value):
+    """JSONB se pasa como texto serializado; el resto sin cambios."""
+    if field == "magical_properties" and value is not None:
+        return json.dumps(value)
+    return value
+
+
+def _row_to_item(row) -> dict:
+    """Convierte un Record a dict, parseando magical_properties (JSONB → dict)."""
+    data = dict(row)
+    mp = data.get("magical_properties")
+    if isinstance(mp, str):
+        try:
+            data["magical_properties"] = json.loads(mp)
+        except (ValueError, TypeError):
+            data["magical_properties"] = {}
+    return data
 
 
 # ═══════════════════════════════════════════════════════
@@ -56,9 +109,7 @@ async def list_items(
 
     rows = await conn.fetch(
         f"""
-        SELECT id, name, description, type, rarity, weight, value_gp,
-               is_magical, is_consumable, requires_attunement, attunement_restriction,
-               source_book, source_page
+        SELECT {ITEM_LIST_COLUMNS}
         FROM items {where}
         ORDER BY name ASC
         LIMIT ${idx} OFFSET ${idx + 1}
@@ -77,24 +128,31 @@ async def create_item(
     if current_user["role"] not in ("admin", "dm"):
         raise HTTPException(status_code=403, detail="Only admins and DMs can create items")
 
+    data = body.model_dump(exclude_unset=True)
+
+    cols: list[str] = []
+    placeholders: list[str] = []
+    params: list = []
+    idx = 1
+    for field, value in data.items():
+        cast = ITEM_FIELD_CASTS.get(field, "")
+        cols.append(field)
+        placeholders.append(f"${idx}{cast}")
+        params.append(_serialize_item_field(field, value))
+        idx += 1
+
     row = await conn.fetchrow(
-        """
-        INSERT INTO items (name, description, type, rarity, weight, value_gp,
-                           is_magical, is_consumable, requires_attunement,
-                           attunement_restriction, source_book, source_page)
-        VALUES ($1,$2,$3::item_type,$4::item_rarity,$5,$6,$7,$8,$9,$10,$11,$12)
-        RETURNING id, name, description, type, rarity, weight, value_gp,
-                  is_magical, is_consumable, requires_attunement, attunement_restriction,
-                  source_book, source_page
+        f"""
+        INSERT INTO items ({', '.join(cols)})
+        VALUES ({', '.join(placeholders)})
+        RETURNING {ITEM_FULL_COLUMNS}
         """,
-        body.name, body.description, body.type, body.rarity,
-        body.weight, body.value_gp, body.is_magical, body.is_consumable,
-        body.requires_attunement, body.attunement_restriction,
-        body.source_book, body.source_page,
+        *params,
     )
-    await log_event(conn, "item_created", "item", str(row["id"]), row["name"],
+    result = _row_to_item(row)
+    await log_event(conn, "item_created", "item", str(result["id"]), result["name"],
                     actor_member_id=str(current_user["id"]))
-    return item_response(dict(row))
+    return item_response(result)
 
 
 @router.get("/items/{item_id}", response_model=dict)
@@ -104,18 +162,12 @@ async def get_item(
     _: dict = Depends(get_current_user),
 ):
     row = await conn.fetchrow(
-        """
-        SELECT id, name, description, type, rarity, weight, value_gp,
-               is_magical, is_consumable, requires_attunement, attunement_restriction,
-               charges_max, charges_recharge, sentient, cursed,
-               source_book, source_page
-        FROM items WHERE id = $1
-        """,
+        f"SELECT {ITEM_FULL_COLUMNS} FROM items WHERE id = $1",
         item_id,
     )
     if not row:
         raise HTTPException(status_code=404, detail="Item not found")
-    return item_response(dict(row))
+    return item_response(_row_to_item(row))
 
 
 @router.put("/items/{item_id}", response_model=dict)
@@ -136,15 +188,14 @@ async def update_item(
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
 
-    # Build dynamic SET clause, casting enums as needed
+    # Build dynamic SET clause, casting enums/JSONB as needed
     set_parts = []
     params: list = []
     idx = 1
-    enum_fields = {"type": "item_type", "rarity": "item_rarity"}
     for field, value in updates.items():
-        cast = f"::{enum_fields[field]}" if field in enum_fields else ""
+        cast = ITEM_FIELD_CASTS.get(field, "")
         set_parts.append(f"{field} = ${idx}{cast}")
-        params.append(value)
+        params.append(_serialize_item_field(field, value))
         idx += 1
 
     params.append(item_id)
@@ -152,12 +203,11 @@ async def update_item(
         f"""
         UPDATE items SET {', '.join(set_parts)}
         WHERE id = ${idx}
-        RETURNING id, name, description, type, rarity, weight, value_gp,
-                  is_magical, is_consumable, requires_attunement, source_book, source_page
+        RETURNING {ITEM_FULL_COLUMNS}
         """,
         *params,
     )
-    return item_response(dict(row))
+    return item_response(_row_to_item(row))
 
 
 @router.delete("/items/{item_id}", status_code=204)

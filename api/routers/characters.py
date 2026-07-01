@@ -14,7 +14,7 @@ from api.models.character import (
     HPUpdate,
     SpellSlotsUpdate,
 )
-from api.models.item import InventoryAdd
+from api.models.inventory_model import InventoryAdd
 
 router = APIRouter(prefix="/api/v1/characters", tags=["characters"])
 
