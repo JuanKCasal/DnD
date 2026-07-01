@@ -82,33 +82,31 @@ Las siguientes skills están instaladas en `.agents/skills/` y se aplican autom�
 ```
 DnD/
 ├── CLAUDE.md
-├── README.md
-├── .env.example
+├── README.md                      # Documentación funcional de la app
+├── PLAN_MEJORAS_ITEMS.md          # Plan por fases del sistema de ítems (I1–I6)
 ├── .gitignore
-├── reset_admin.py                 ← Utilidad para resetear password de admin
+├── Dockerfile                     # ⚠️ Dockerfile en raíz (copia api/ → ./api/)
+├── reset_admin.py                 # Utilidad: resetear password de admin (BD)
+├── fix_alignments.py              # Utilidad one-off: normaliza alignment a enums (LG, NG…)
+├── skills-lock.json               # Lock de skills instaladas
 │
-├── .agents/                       ← Skills instaladas (NO editar manualmente)
-│   └── skills/
-│       ├── emil-design-eng/
-│       ├── impeccable/
-│       ├── brandkit/
-│       ├── design-taste-frontend/
-│       ├── high-end-visual-design/
-│       └── dnd/
+├── .agents/                       # Skills instaladas (NO editar manualmente)
+│   └── skills/{emil-design-eng, impeccable, brandkit,
+│               design-taste-frontend, high-end-visual-design, dnd}
 │
-├── certs/                         ← Certificados Aiven (en .gitignore)
-│   ├── ca.pem
-│   ├── service.cert
-│   └── service.key
+├── certs/                         # Certificados Aiven (en .gitignore)
+│   ├── ca.pem                     # CA compartido (Postgres + Kafka)
+│   ├── service.cert               # Certificado de acceso Kafka
+│   └── service.key                # Clave privada Kafka
 │
-├── frontend/                      ← SPA → GitHub Pages
-│   ├── index.html                 # Cache-bust: v=20260630
+├── frontend/                      # SPA → GitHub Pages
+│   ├── index.html                 # Cache-bust por versión
 │   ├── css/
 │   │   ├── main.css               # Design system + tokens (light theme)
 │   │   ├── animations.css         # Keyframes y transiciones
 │   │   └── components.css         # Componentes reutilizables
 │   ├── js/
-│   │   ├── api.js                 # Fetch centralizado con JWT
+│   │   ├── api.js                 # Fetch centralizado con JWT (get/post/put/del)
 │   │   ├── auth.js                # Sesión, roles, guards
 │   │   ├── router.js              # Hash-based SPA + nav horizontal con mega-menu
 │   │   ├── utils.js               # Helpers (dice, formatters, etc.)
@@ -117,56 +115,68 @@ DnD/
 │   │       └── modal.js           # Diálogos con animación spring
 │   └── pages/
 │       ├── login.js
-│       ├── dashboard.js
-│       ├── campaigns.js
-│       ├── characters.js          # Ficha completa D&D 5e + edit/delete + modal 5 tabs + inventario inline (~1843 líneas)
-│       ├── sessions.js
-│       ├── inventory.js           # Modo player/treasury/catalogue detectado por hash
-│       └── members.js
+│       ├── dashboard.js           # 5 stats de comunidad en tiempo real
+│       ├── campaigns.js           # CRUD campañas con cards animadas
+│       ├── characters.js          # Ficha D&D 5e + modal 5 tabs + panel de combate calculado (~1900 líneas)
+│       ├── sessions.js            # Timeline + detalle con tabs + asistencia + botín (loot)
+│       ├── inventory.js           # Modo player/treasury/catalogue por hash; slots, sintonía, tienda, cargas, packs (~1400 líneas)
+│       └── members.js             # Grid de miembros + edición de rol
 │
-├── api/                           ← FastAPI → Railway
+├── api/                           # FastAPI → Railway
+│   ├── Dockerfile                 # ⚠️ Segundo Dockerfile (copia . → ./api/) — redundante con el de raíz
 │   ├── main.py                    # App, CORS, lifespan, routers
-│   ├── config.py                  # Settings, cert decoding, CORS origins
+│   ├── config.py                  # Settings, decodificación de certs, CORS origins
 │   ├── dependencies.py            # get_db, get_current_user, require_role, hash_password
 │   ├── requirements.txt
+│   ├── __init__.py                # (paquete)
 │   ├── db/
 │   │   ├── connection.py          # Pool asyncpg + SSL Aiven
-│   │   ├── kafka.py               # Productor/consumidor Kafka + topics
+│   │   ├── kafka.py               # Productor Kafka + topics
 │   │   └── helpers.py             # paginate, list_response, item_response, records_to_list, log_event
 │   ├── models/
 │   │   ├── auth.py                # LoginRequest, Token, TokenData
 │   │   ├── member.py              # MemberCreate, MemberUpdate, MemberOut
 │   │   ├── campaign.py            # CampaignCreate, CampaignUpdate, CampaignOut
-│   │   ├── character.py           # CharacterCreate, CharacterUpdate, CharacterOut, HPUpdate, etc.
+│   │   ├── character.py           # CharacterCreate/Update/Out, HPUpdate, etc.
 │   │   ├── session_model.py       # SessionCreate, SessionUpdate, SessionOut
-│   │   ├── item.py                # ItemCreate, ItemUpdate, ItemOut, InventoryAdd
-│   │   ├── inventory_model.py     # Extended item fields (magical, damage, ac_base, etc.)
+│   │   ├── inventory_model.py     # ÚNICO modelo de ítem: ItemCreate/Update/Out (armas, armaduras,
+│   │   │                          #   cargas, magical_properties), InventoryAdd/Update (slot, attuned),
+│   │   │                          #   TreasuryAdd/Update, CurrencyUpdate  [item.py fue eliminado en I1]
 │   │   ├── rank.py                # RankCreate, RankUpdate, RankOut
 │   │   ├── clan.py                # ClanCreate, ClanUpdate, ClanOut, ClanInvitationCreate
-│   │   ├── chat.py                # ChatRoomCreate/Out, ChatMessageCreate/Out, DirectMessageCreate/Out
+│   │   ├── chat.py                # ChatRoom*, ChatMessage*, DirectMessage*
 │   │   └── event.py               # EventLogOut
+│   ├── services/                  # Lógica de dominio pura (Fases I4–I5)
+│   │   ├── character_mechanics.py # compute_combat: CA efectiva, velocidad, sigilo, ataques
+│   │   └── economy.py             # conversión de moneda (cp), peso de monedas, carga/encumbramiento
 │   └── routers/
 │       ├── auth.py                # POST /login, /register
 │       ├── members.py             # GET/POST/PUT /members (POST admin-only)
-│       ├── campaigns.py           # CRUD /campaigns + DELETE
-│       ├── characters.py          # CRUD /characters + DELETE + /hp /conditions /spell-slots /inventory
+│       ├── campaigns.py           # CRUD /campaigns + DELETE + /treasury (currency)
+│       ├── characters.py          # CRUD /characters + /hp /conditions /spell-slots + /combat (I4)
 │       ├── sessions.py            # CRUD /sessions + DELETE + asistencia
-│       ├── inventory.py           # GET/POST/PUT/DELETE /items + campaign treasury
+│       ├── inventory.py           # /items (catálogo completo), inventario de personaje (slots/sintonía),
+│       │                          #   tesoro de campaña, /currency + /carry, /shop/buy|sell,
+│       │                          #   /use /use-charge /recharge, /packs, /sessions/{id}/loot  (~1150 líneas)
 │       ├── ranks.py               # CRUD /ranks
 │       ├── clans.py               # CRUD /clans + membership + invitations
 │       ├── chat.py                # GET/POST /chat/rooms + /messages + DMs
 │       └── events.py              # GET /events (event log público)
 │
 ├── db/
-│   ├── migrate.py                 ← Runner de migraciones
+│   ├── migrate.py                 # Runner de migraciones (acepta nombre por CLI)
+│   ├── seed_items.py              # Seeder idempotente del catálogo SRD (216 ítems)
 │   └── migrations/
 │       ├── 001_initial_schema.sql # Schema v2.0 completo (656 líneas)
-│       └── README.md
+│       └── 003_equipment_slots.sql# Columna character_inventory.slot (Fase I3)
+│                                  # (no hay 002: el seed es el script standalone seed_items.py)
 │
 └── .github/
     └── workflows/
         └── deploy-frontend.yml
 ```
+
+> **Nota de limpieza:** No hay archivos vacíos "basura" — los `__init__.py` vacíos son marcadores de paquete Python necesarios. Sí existe **redundancia de Dockerfiles**: `Dockerfile` (raíz) y `api/Dockerfile` hacen prácticamente lo mismo con rutas distintas. Conviene conservar solo el que use Railway y borrar el otro para evitar confusión.
 
 ---
 
@@ -534,6 +544,46 @@ git add frontend/pages/characters.js frontend/js/router.js frontend/pages/invent
 git commit -m "feat: PHB competencias + tab inventario en ficha + reestructura rutas inventario"
 git push origin main
 ```
+
+---
+
+## Sistema de Ítems — Fases I1–I6 ✅ COMPLETADA
+
+Rediseño integral del manejo de ítems (ver `PLAN_MEJORAS_ITEMS.md`).
+
+### Fase I1 — Saneamiento del modelo de datos
+- [x] Eliminado `api/models/item.py` (modelo muerto/duplicado con `item_type` e `icon_url` inexistente)
+- [x] `inventory_model.py` como única fuente: `ItemCreate/Update/Out` exponen TODAS las columnas del schema (armas, armaduras, cargas, `sentient/cursed`, `magical_properties`, refs SRD) con validación de enums
+- [x] `create/update/list/get` de `/items` reescritos con INSERT/UPDATE dinámico y casts (`::item_type`, `::item_rarity`, `::jsonb`)
+- [x] **Fix crítico:** `_character_select()` en `characters.py` estaba truncado (rompía todas las consultas de personajes)
+
+### Fase I2 — Catálogo SRD + UI de ítem
+- [x] `db/seed_items.py` — seeder idempotente (índice único `dnd5eapi_index` + `ON CONFLICT`), **216 ítems** de la guía (armas, armaduras, munición, herramientas, gear, pociones, pergaminos, venenos, monturas/vehículos, objetos mágicos)
+- [x] Modal de detalle de ítem (daño/CA/propiedades) + modal crear/editar con campos condicionales por tipo
+- [x] Filtro de tipos completo (rod, staff, wand, ammunition, vehicle)
+
+### Fase I3 — Slots de equipo, sintonía y reglas de manos
+- [x] Migración `003_equipment_slots.sql` — `character_inventory.slot`
+- [x] Consolidados los endpoints de inventario en `inventory.py` (eliminados los duplicados de `characters.py`)
+- [x] Reglas: 1 ítem por slot (anillos = 2 slots), arma a 2 manos bloquea off_hand, escudo vs 2 manos, **límite de sintonía = 3** (solo ítems que la requieren)
+- [x] Frontend: selector de slot al equipar, contador "🔮 X/3", toggle de sintonía
+
+### Fase I4 — Integración mecánica con la ficha
+- [x] `api/services/character_mechanics.py` → `compute_combat`: CA efectiva con desglose, penalización de velocidad por FUE, desventaja de sigilo, ataques (FUE/DES según finesse/distancia + competencia + bonos mágicos)
+- [x] `GET /api/v1/characters/{id}/combat` (derivado, no persiste)
+- [x] Ficha: panel "Combate según equipo"
+
+### Fase I5 — Economía
+- [x] `api/services/economy.py` — conversión en cobre, peso de monedas (50 = 1 lb), capacidad de carga (FUE×15) y encumbramiento
+- [x] `GET/PUT /characters/{id}/currency`, `POST /shop/buy`, `POST /shop/sell` (transaccionales)
+- [x] Frontend: cartera editable, barra de carga, botones vender/comprar
+
+### Fase I6 — Consumibles, cargas, packs y botín
+- [x] `POST /inventory/{item_id}/use` (pociones de curación aplican PG con tirada), `/use-charge`, `/recharge`
+- [x] `GET /packs` + `POST /characters/{id}/packs/{key}` — 4 packs de aventurero
+- [x] `session_loot`: `GET/POST/DELETE /sessions/{id}/loot` + `POST .../award` (a personaje o tesoro)
+- [x] Frontend inventario: botón Usar, control de cargas, selector de packs
+- [x] Frontend sesiones: **tab "💎 Botín"** en el detalle — listar, añadir (DM/admin), otorgar a personaje o tesoro, eliminar
 
 ---
 
