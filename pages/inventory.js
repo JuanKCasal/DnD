@@ -133,8 +133,15 @@ export async function render(container) {
     addBtn.innerHTML = '<span style="font-size:16px;">+</span> Añadir item';
     addBtn.addEventListener('click', () => openAddItemModal(charSelect.value, 'character', charInventoryEl));
 
+    const packBtn = document.createElement('button');
+    packBtn.className = 'btn';
+    packBtn.style.cssText = 'white-space:nowrap;';
+    packBtn.textContent = '🎒 Pack';
+    packBtn.addEventListener('click', () => openPackModal(charSelect.value, charInventoryEl));
+
     controls.appendChild(charSelect);
     controls.appendChild(addBtn);
+    controls.appendChild(packBtn);
     content.appendChild(controls);
 
     const charInventoryEl = document.createElement('div');
@@ -313,6 +320,45 @@ export async function render(container) {
       } catch (e) { toast.error(e.message); okBtn.disabled = false; }
     });
     overlay.appendChild(modal); document.body.appendChild(overlay);
+  }
+
+  async function openPackModal(charId, parentEl) {
+    const overlay = buildOverlay();
+    const modal = buildModal('🎒 Añadir pack de aventurero');
+    const list = document.createElement('div');
+    list.innerHTML = '<div style="color:var(--ink-muted);font-size:13px;">Cargando...</div>';
+    modal.appendChild(list);
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    try {
+      const packs = (await api.get('/packs')).data || [];
+      list.innerHTML = '';
+      packs.forEach(p => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;';
+        const info = document.createElement('div');
+        info.innerHTML = `<div style="font-weight:600;color:var(--ink);font-size:14px;">${p.name}</div>
+          <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${p.items.length} tipos de objeto</div>`;
+        const btn = buildBtn('Añadir', true);
+        btn.addEventListener('click', async () => {
+          btn.disabled = true;
+          try {
+            await api.post(`/characters/${charId}/packs/${p.key}`, {});
+            toast.success(`Pack «${p.name}» añadido`);
+            close();
+            loadCharInventory(charId, parentEl);
+          } catch (e) { toast.error(e.message); btn.disabled = false; }
+        });
+        row.appendChild(info);
+        row.appendChild(btn);
+        list.appendChild(row);
+      });
+      if (!packs.length) list.innerHTML = '<div style="color:var(--ink-muted);font-size:13px;">Sin packs disponibles</div>';
+    } catch (e) {
+      list.innerHTML = `<div style="color:var(--crimson);font-size:13px;">Error: ${e.message}</div>`;
+    }
   }
 
   /* ═══════════════════════════════════════════════════════════════
@@ -654,6 +700,47 @@ export async function render(container) {
           }
         });
         actions.appendChild(attuneBtn);
+      }
+
+      // Usar consumible
+      if (item.is_consumable) {
+        const useBtn = document.createElement('button');
+        useBtn.style.cssText = `
+          padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;
+          background:rgba(74,158,255,0.12);color:#4a9eff;border:1px solid #4a9eff44;
+          transition:all var(--dur-fast);`;
+        useBtn.textContent = 'Usar';
+        useBtn.addEventListener('click', async () => {
+          try {
+            const r = await api.post(`/characters/${ownerId}/inventory/${item.item_id}/use`, {});
+            const d = r.data || {};
+            toast.success(d.healed ? `Curado ${d.healed} PG (PG: ${d.hp})` : `Usaste ${item.name}`);
+            loadCharInventory(ownerId, parentEl);
+          } catch (e) { toast.error(e.message); }
+        });
+        actions.appendChild(useBtn);
+      }
+
+      // Cargas (clic = usar, clic derecho = recargar)
+      if (item.charges_max) {
+        const cc = item.charges_current == null ? item.charges_max : item.charges_current;
+        const chgBtn = document.createElement('button');
+        chgBtn.style.cssText = `
+          padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;
+          background:var(--stone-light);color:var(--ink-muted);border:1px solid var(--border);
+          transition:all var(--dur-fast);`;
+        chgBtn.textContent = `⚡ ${cc}/${item.charges_max}`;
+        chgBtn.title = 'Clic: usar carga · Clic derecho: recargar';
+        chgBtn.addEventListener('click', async () => {
+          try { await api.post(`/characters/${ownerId}/inventory/${item.item_id}/use-charge`, {}); toast.success('Carga usada'); loadCharInventory(ownerId, parentEl); }
+          catch (e) { toast.error(e.message); }
+        });
+        chgBtn.addEventListener('contextmenu', async (ev) => {
+          ev.preventDefault();
+          try { await api.post(`/characters/${ownerId}/inventory/${item.item_id}/recharge`, {}); toast.success('Recargado'); loadCharInventory(ownerId, parentEl); }
+          catch (e) { toast.error(e.message); }
+        });
+        actions.appendChild(chgBtn);
       }
 
       // Vender (si el item tiene valor)
