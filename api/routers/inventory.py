@@ -1,4 +1,5 @@
 import json
+import random
 import uuid
 
 import asyncpg
@@ -805,3 +806,349 @@ async def shop_sell(
     return item_response({"sold": item["name"], "quantity": qty,
                           "gained_cp": gain_cp, "currency": new_currency,
                           "formatted": format_currency(new_currency)})
+
+
+# ═══════════════════════════════════════════════════════
+#  CONSUMIBLES, CARGAS Y PACKS (Fase I6)
+# ═══════════════════════════════════════════════════════
+# Pociones de curación conocidas: (n_dados, caras, bono)
+HEALING_POTIONS = {
+    "potion-healing": (2, 4, 2),
+    "potion-greater-healing": (4, 4, 4),
+    "potion-superior-healing": (8, 4, 8),
+    "potion-supreme-healing": (10, 4, 20),
+}
+
+# Packs de aventurero (guía §8) usando slugs sembrados en el catálogo
+PACKS = {
+    "explorers-pack": {"name": "Equipo de explorador", "items": [
+        ("backpack", 1), ("bedroll", 1), ("mess-kit", 1), ("tinderbox", 1),
+        ("torch", 10), ("rations", 10), ("rope-hempen", 1), ("waterskin", 1),
+        ("clothes-travelers", 1)]},
+    "dungeoneers-pack": {"name": "Equipo de mazmorrero", "items": [
+        ("backpack", 1), ("crowbar", 1), ("hammer", 1), ("piton", 10),
+        ("hooded-lantern", 1), ("oil-flask", 2), ("tinderbox", 1),
+        ("rations", 10), ("waterskin", 1), ("rope-hempen", 1)]},
+    "burglars-pack": {"name": "Equipo de ladrón", "items": [
+        ("backpack", 1), ("candle", 5), ("crowbar", 1), ("hammer", 1),
+        ("piton", 10), ("hooded-lantern", 1), ("oil-flask", 2), ("rations", 5),
+        ("tinderbox", 1), ("waterskin", 1), ("rope-silk", 1)]},
+    "priests-pack": {"name": "Equipo de sacerdote", "items": [
+        ("backpack", 1), ("blanket", 1), ("candle", 10), ("tinderbox", 1),
+        ("rations", 2), ("waterskin", 1), ("holy-symbol-amulet", 1)]},
+}
+
+
+def _roll(n: int, d: int, bonus: int) -> int:
+    return sum(random.randint(1, d) for _ in range(n)) + bonus
+
+
+@router.post("/characters/{char_id}/inventory/{item_id}/use", response_model=dict)
+async def use_consumable(
+    char_id: uuid.UUID,
+    item_id: uuid.UUID,
+    conn: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    char = await conn.fetchrow(
+        "SELECT id, member_id, hp, max_hp FROM characters WHERE id = $1 AND active = TRUE",
+        char_id,
+    )
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found")
+    if not _can_edit_char(current_user, char["member_id"]):
+        raise HTTPException(status_code=403, detail="Cannot modify another player's inventory")
+
+    row = await conn.fetchrow(
+        """
+        SELECT ci.quantity, i.name, i.is_consumable, i.dnd5eapi_index
+        FROM character_inventory ci JOIN items i ON i.id = ci.item_id
+        WHERE ci.character_id = $1 AND ci.item_id = $2
+        """,
+        char_id, item_id,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Inventory entry not found")
+    if not row["is_consumable"]:
+        raise HTTPException(status_code=400, detail={
+            "code": "NOT_CONSUMABLE", "message": "Este objeto no es consumible"})
+    if row["quantity"] < 1:
+        raise HTTPException(status_code=400, detail="No quedan unidades")
+
+    result = {"used": row["name"]}
+    async with conn.transaction():
+        heal = HEALING_POTIONS.get(row["dnd5eapi_index"])
+        if heal:
+            amount = _roll(*heal)
+            new_hp = min(char["max_hp"] or 0, (char["hp"] or 0) + amount)
+            await conn.execute("UPDATE characters SET hp = $1 WHERE id = $2", new_hp, char_id)
+            result["healed"] = amount
+            result["hp"] = new_hp
+        if row["quantity"] <= 1:
+            await conn.execute(
+                "DELETE FROM character_inventory WHERE character_id = $1 AND item_id = $2",
+                char_id, item_id)
+            result["remaining"] = 0
+        else:
+            await conn.execute(
+                "UPDATE character_inventory SET quantity = quantity - 1 "
+                "WHERE character_id = $1 AND item_id = $2", char_id, item_id)
+            result["remaining"] = row["quantity"] - 1
+    await publish_event(TOPIC_INVENTORY_UPDATED, {
+        "event": "item_used", "character_id": str(char_id), "item_id": str(item_id)})
+    return item_response(result)
+
+
+@router.post("/characters/{char_id}/inventory/{item_id}/use-charge", response_model=dict)
+async def use_charge(
+    char_id: uuid.UUID,
+    item_id: uuid.UUID,
+    conn: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    char = await _char_for_economy(conn, char_id)
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found")
+    if not _can_edit_char(current_user, char["member_id"]):
+        raise HTTPException(status_code=403, detail="Cannot modify another player's inventory")
+
+    row = await conn.fetchrow(
+        """
+        SELECT ci.charges_current, i.charges_max, i.name
+        FROM character_inventory ci JOIN items i ON i.id = ci.item_id
+        WHERE ci.character_id = $1 AND ci.item_id = $2
+        """,
+        char_id, item_id,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Inventory entry not found")
+    if row["charges_max"] is None:
+        raise HTTPException(status_code=400, detail={
+            "code": "NO_CHARGES", "message": "Este objeto no tiene cargas"})
+    current = row["charges_current"] if row["charges_current"] is not None else row["charges_max"]
+    if current <= 0:
+        raise HTTPException(status_code=400, detail={
+            "code": "NO_CHARGES_LEFT", "message": "Sin cargas disponibles"})
+    new = current - 1
+    await conn.execute(
+        "UPDATE character_inventory SET charges_current = $3 "
+        "WHERE character_id = $1 AND item_id = $2", char_id, item_id, new)
+    return item_response({"name": row["name"], "charges_current": new,
+                          "charges_max": row["charges_max"]})
+
+
+@router.post("/characters/{char_id}/inventory/{item_id}/recharge", response_model=dict)
+async def recharge_item(
+    char_id: uuid.UUID,
+    item_id: uuid.UUID,
+    conn: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    char = await _char_for_economy(conn, char_id)
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found")
+    if not _can_edit_char(current_user, char["member_id"]):
+        raise HTTPException(status_code=403, detail="Cannot modify another player's inventory")
+
+    row = await conn.fetchrow(
+        """
+        SELECT i.charges_max, i.name FROM character_inventory ci
+        JOIN items i ON i.id = ci.item_id
+        WHERE ci.character_id = $1 AND ci.item_id = $2
+        """,
+        char_id, item_id,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Inventory entry not found")
+    if row["charges_max"] is None:
+        raise HTTPException(status_code=400, detail={
+            "code": "NO_CHARGES", "message": "Este objeto no tiene cargas"})
+    await conn.execute(
+        "UPDATE character_inventory SET charges_current = $3 "
+        "WHERE character_id = $1 AND item_id = $2", char_id, item_id, row["charges_max"])
+    return item_response({"name": row["name"], "charges_current": row["charges_max"],
+                          "charges_max": row["charges_max"]})
+
+
+@router.get("/packs", response_model=dict)
+async def list_packs(_: dict = Depends(get_current_user)):
+    data = [{"key": k, "name": v["name"],
+             "items": [{"slug": s, "quantity": q} for s, q in v["items"]]}
+            for k, v in PACKS.items()]
+    return list_response(data, len(data), 1, len(data) or 1)
+
+
+@router.post("/characters/{char_id}/packs/{pack_key}", response_model=dict, status_code=201)
+async def add_pack(
+    char_id: uuid.UUID,
+    pack_key: str,
+    conn: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    char = await _char_for_economy(conn, char_id)
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found")
+    if not _can_edit_char(current_user, char["member_id"]):
+        raise HTTPException(status_code=403, detail="Cannot modify another player's inventory")
+    pack = PACKS.get(pack_key)
+    if not pack:
+        raise HTTPException(status_code=404, detail="Pack not found")
+
+    added = []
+    missing = []
+    async with conn.transaction():
+        for slug, qty in pack["items"]:
+            item = await conn.fetchrow("SELECT id, name FROM items WHERE dnd5eapi_index = $1", slug)
+            if not item:
+                missing.append(slug)
+                continue
+            await conn.execute(
+                """
+                INSERT INTO character_inventory (character_id, item_id, quantity)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (character_id, item_id)
+                DO UPDATE SET quantity = character_inventory.quantity + EXCLUDED.quantity
+                """,
+                char_id, item["id"], qty)
+            added.append({"name": item["name"], "quantity": qty})
+    return item_response({"pack": pack["name"], "added": added, "missing": missing})
+
+
+# ═══════════════════════════════════════════════════════
+#  BOTÍN DE SESIÓN (session_loot, Fase I6)
+# ═══════════════════════════════════════════════════════
+async def _session_campaign(conn, session_id):
+    return await conn.fetchrow(
+        """
+        SELECT s.id, s.campaign_id, c.dm_id
+        FROM sessions s JOIN campaigns c ON c.id = s.campaign_id
+        WHERE s.id = $1
+        """,
+        session_id,
+    )
+
+
+def _can_manage_campaign(current_user, dm_id) -> bool:
+    return current_user["role"] == "admin" or str(dm_id) == str(current_user["id"])
+
+
+@router.get("/sessions/{session_id}/loot", response_model=dict)
+async def list_session_loot(
+    session_id: uuid.UUID,
+    conn: asyncpg.Connection = Depends(get_db),
+    _: dict = Depends(get_current_user),
+):
+    rows = await conn.fetch(
+        """
+        SELECT sl.id, sl.item_id, sl.item_name, sl.quantity, sl.awarded_to,
+               sl.notes, sl.created_at,
+               i.name AS catalog_name, i.rarity, i.type,
+               ch.name AS awarded_to_name
+        FROM session_loot sl
+        LEFT JOIN items i ON i.id = sl.item_id
+        LEFT JOIN characters ch ON ch.id = sl.awarded_to
+        WHERE sl.session_id = $1
+        ORDER BY sl.created_at DESC
+        """,
+        session_id,
+    )
+    return item_response(records_to_list(rows))
+
+
+@router.post("/sessions/{session_id}/loot", response_model=dict, status_code=201)
+async def add_session_loot(
+    session_id: uuid.UUID,
+    body: TreasuryAdd,
+    conn: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    sess = await _session_campaign(conn, session_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if not _can_manage_campaign(current_user, sess["dm_id"]):
+        raise HTTPException(status_code=403, detail="Only the DM or admin can add loot")
+
+    item = await conn.fetchrow("SELECT id, name FROM items WHERE id = $1", body.item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    row = await conn.fetchrow(
+        """
+        INSERT INTO session_loot (session_id, item_id, item_name, quantity, notes)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id, item_id, item_name, quantity, awarded_to, notes, created_at
+        """,
+        session_id, body.item_id, item["name"], body.quantity, body.notes,
+    )
+    return item_response(dict(row))
+
+
+@router.post("/sessions/{session_id}/loot/{loot_id}/award", response_model=dict)
+async def award_session_loot(
+    session_id: uuid.UUID,
+    loot_id: uuid.UUID,
+    character_id: uuid.UUID | None = Query(None),
+    to_treasury: bool = Query(False),
+    conn: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    sess = await _session_campaign(conn, session_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if not _can_manage_campaign(current_user, sess["dm_id"]):
+        raise HTTPException(status_code=403, detail="Only the DM or admin can award loot")
+
+    loot = await conn.fetchrow(
+        "SELECT id, item_id, quantity FROM session_loot WHERE id = $1 AND session_id = $2",
+        loot_id, session_id,
+    )
+    if not loot:
+        raise HTTPException(status_code=404, detail="Loot entry not found")
+    if not loot["item_id"]:
+        raise HTTPException(status_code=400, detail="Loot has no linked catalog item")
+
+    async with conn.transaction():
+        if to_treasury:
+            await conn.execute(
+                """
+                INSERT INTO campaign_treasury (campaign_id, item_id, quantity)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (campaign_id, item_id)
+                DO UPDATE SET quantity = campaign_treasury.quantity + EXCLUDED.quantity,
+                              updated_at = NOW()
+                """,
+                sess["campaign_id"], loot["item_id"], loot["quantity"])
+            await conn.execute("UPDATE session_loot SET awarded_to = NULL WHERE id = $1", loot_id)
+        elif character_id:
+            await conn.execute(
+                """
+                INSERT INTO character_inventory (character_id, item_id, quantity)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (character_id, item_id)
+                DO UPDATE SET quantity = character_inventory.quantity + EXCLUDED.quantity
+                """,
+                character_id, loot["item_id"], loot["quantity"])
+            await conn.execute(
+                "UPDATE session_loot SET awarded_to = $2 WHERE id = $1", loot_id, character_id)
+        else:
+            raise HTTPException(status_code=400, detail="Specify character_id or to_treasury")
+    return item_response({"awarded": str(loot_id),
+                          "target": "treasury" if to_treasury else str(character_id)})
+
+
+@router.delete("/sessions/{session_id}/loot/{loot_id}", status_code=204)
+async def delete_session_loot(
+    session_id: uuid.UUID,
+    loot_id: uuid.UUID,
+    conn: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    sess = await _session_campaign(conn, session_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if not _can_manage_campaign(current_user, sess["dm_id"]):
+        raise HTTPException(status_code=403, detail="Only the DM or admin can delete loot")
+    result = await conn.execute(
+        "DELETE FROM session_loot WHERE id = $1 AND session_id = $2", loot_id, session_id)
+    if result == "DELETE 0":
+        raise HTTPException(status_code=404, detail="Loot entry not found")
