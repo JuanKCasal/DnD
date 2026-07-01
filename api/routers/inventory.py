@@ -55,6 +55,18 @@ def _serialize_item_field(field: str, value):
     return value
 
 
+def _suggest_slot(item) -> str | None:
+    """Slot sugerido según el tipo de ítem (el cliente puede sobrescribirlo)."""
+    t = item["type"]
+    if t == "weapon":
+        return "main_hand"
+    if t == "armor":
+        return "off_hand" if item["armor_category"] == "Shield" else "body"
+    if t == "ring":
+        return "ring_left"
+    return None
+
+
 def _row_to_item(row) -> dict:
     """Convierte un Record a dict, parseando magical_properties (JSONB → dict)."""
     data = dict(row)
@@ -242,11 +254,13 @@ async def get_character_inventory(
 
     rows = await conn.fetch(
         """
-        SELECT ci.item_id, ci.quantity, ci.equipped, ci.attuned,
+        SELECT ci.item_id, ci.quantity, ci.equipped, ci.slot, ci.attuned,
                ci.charges_current, ci.custom_name, ci.notes,
                i.name, i.description, i.type, i.rarity, i.weight, i.value_gp,
                i.is_magical, i.is_consumable, i.requires_attunement,
-               i.charges_max, i.source_book
+               i.charges_max, i.source_book,
+               i.damage_dice, i.damage_type, i.damage_dice_versatile,
+               i.ac_base, i.armor_category, i.weapon_category, i.weapon_properties
         FROM character_inventory ci
         JOIN items i ON i.id = ci.item_id
         WHERE ci.character_id = $1
@@ -318,23 +332,92 @@ async def update_character_inventory(
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
 
-    set_parts = []
-    params: list = []
-    idx = 1
-    for field, value in updates.items():
-        set_parts.append(f"{field} = ${idx}")
-        params.append(value)
-        idx += 1
-
-    params += [char_id, item_id]
-    row = await conn.fetchrow(
-        f"""
-        UPDATE character_inventory SET {', '.join(set_parts)}
-        WHERE character_id = ${idx} AND item_id = ${idx + 1}
-        RETURNING item_id, quantity, equipped, attuned, charges_current, custom_name, notes
+    # Metadatos del ítem (para reglas de equipo y sintonía)
+    item = await conn.fetchrow(
+        """
+        SELECT i.type, i.armor_category, i.weapon_properties, i.requires_attunement
+        FROM character_inventory ci JOIN items i ON i.id = ci.item_id
+        WHERE ci.character_id = $1 AND ci.item_id = $2
         """,
-        *params,
+        char_id, item_id,
     )
+    if not item:
+        raise HTTPException(status_code=404, detail="Inventory entry not found")
+
+    props = list(item["weapon_properties"] or [])
+    two_handed = "two_handed" in props
+
+    async with conn.transaction():
+        # ── Regla de sintonía ──
+        if updates.get("attuned") is True:
+            if not item["requires_attunement"]:
+                raise HTTPException(status_code=400, detail={
+                    "code": "ATTUNEMENT_NOT_REQUIRED",
+                    "message": "Este objeto no requiere sintonía",
+                })
+            attuned_count = await conn.fetchval(
+                """
+                SELECT COUNT(*) FROM character_inventory
+                WHERE character_id = $1 AND attuned = TRUE AND item_id <> $2
+                """,
+                char_id, item_id,
+            )
+            if attuned_count >= 3:
+                raise HTTPException(status_code=400, detail={
+                    "code": "ATTUNEMENT_LIMIT_REACHED",
+                    "message": "Ya tienes 3 objetos sintonizados (máximo permitido)",
+                })
+
+        # ── Reglas de equipo / slots ──
+        if updates.get("equipped") is True:
+            slot = updates.get("slot") or _suggest_slot(item)
+            updates["slot"] = slot
+            if slot:
+                # Un solo ítem por slot (los anillos usan dos slots distintos)
+                await conn.execute(
+                    """
+                    UPDATE character_inventory SET equipped = FALSE, slot = NULL
+                    WHERE character_id = $1 AND slot = $2 AND item_id <> $3
+                    """,
+                    char_id, slot, item_id,
+                )
+                # Arma a dos manos ocupa main_hand y bloquea off_hand
+                if slot == "main_hand" and two_handed:
+                    await conn.execute(
+                        "UPDATE character_inventory SET equipped = FALSE, slot = NULL "
+                        "WHERE character_id = $1 AND slot = 'off_hand'",
+                        char_id,
+                    )
+                # Equipar en off_hand (escudo/arma) desaloja un arma a dos manos
+                if slot == "off_hand":
+                    await conn.execute(
+                        """
+                        UPDATE character_inventory ci SET equipped = FALSE, slot = NULL
+                        FROM items i
+                        WHERE ci.item_id = i.id AND ci.character_id = $1
+                          AND ci.slot = 'main_hand' AND 'two_handed' = ANY(i.weapon_properties)
+                        """,
+                        char_id,
+                    )
+        elif updates.get("equipped") is False:
+            updates["slot"] = None  # al desequipar, se libera el slot
+
+        # ── Aplicar cambios ──
+        set_parts, params, idx = [], [], 1
+        for field, value in updates.items():
+            set_parts.append(f"{field} = ${idx}")
+            params.append(value)
+            idx += 1
+        params += [char_id, item_id]
+        row = await conn.fetchrow(
+            f"""
+            UPDATE character_inventory SET {', '.join(set_parts)}
+            WHERE character_id = ${idx} AND item_id = ${idx + 1}
+            RETURNING item_id, quantity, equipped, slot, attuned,
+                      charges_current, custom_name, notes
+            """,
+            *params,
+        )
     if not row:
         raise HTTPException(status_code=404, detail="Inventory entry not found")
     return item_response(dict(row))

@@ -14,7 +14,6 @@ from api.models.character import (
     HPUpdate,
     SpellSlotsUpdate,
 )
-from api.models.inventory_model import InventoryAdd
 
 router = APIRouter(prefix="/api/v1/characters", tags=["characters"])
 
@@ -328,75 +327,11 @@ async def update_spell_slots(
     return item_response({"spell_slots": body.spell_slots})
 
 
-@router.get("/{char_id}/inventory", response_model=dict)
-async def get_inventory(
-    char_id: uuid.UUID,
-    conn: asyncpg.Connection = Depends(get_db),
-    _: dict = Depends(get_current_user),
-):
-    rows = await conn.fetch(
-        """
-        SELECT ci.item_id, ci.quantity, ci.equipped, ci.attuned, ci.notes, ci.custom_name,
-               i.name, i.type AS item_type, i.rarity, i.weight, i.value_gp, i.is_magical,
-               i.damage_dice, i.damage_type, i.ac_base
-        FROM character_inventory ci
-        JOIN items i ON i.id = ci.item_id
-        WHERE ci.character_id = $1
-        ORDER BY i.name ASC
-        """,
-        char_id,
-    )
-    return {"data": records_to_list(rows)}
-
-
-@router.post("/{char_id}/inventory", response_model=dict, status_code=201)
-async def add_to_inventory(
-    char_id: uuid.UUID,
-    body: InventoryAdd,
-    conn: asyncpg.Connection = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    row = await conn.fetchrow("SELECT member_id FROM characters WHERE id = $1", char_id)
-    if not row:
-        raise HTTPException(status_code=404, detail="Character not found")
-    if not _can_edit(current_user, row["member_id"]):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    await conn.execute(
-        """
-        INSERT INTO character_inventory (character_id, item_id, quantity, equipped, notes)
-        VALUES ($1, $2, $3, $4, $5)
-        ON CONFLICT (character_id, item_id) DO UPDATE
-        SET quantity = character_inventory.quantity + EXCLUDED.quantity
-        """,
-        char_id, body.item_id, body.quantity, body.equipped, body.notes,
-    )
-    await publish_event(TOPIC_INVENTORY_UPDATED, {
-        "character_id": str(char_id),
-        "item_id": str(body.item_id),
-        "action": "added",
-        "quantity": body.quantity,
-    })
-    return item_response({"character_id": str(char_id), "item_id": str(body.item_id)})
-
-
-@router.delete("/{char_id}/inventory/{item_id}", status_code=204)
-async def remove_from_inventory(
-    char_id: uuid.UUID,
-    item_id: uuid.UUID,
-    conn: asyncpg.Connection = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    row = await conn.fetchrow("SELECT member_id FROM characters WHERE id = $1", char_id)
-    if not row:
-        raise HTTPException(status_code=404, detail="Character not found")
-    if not _can_edit(current_user, row["member_id"]):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    await conn.execute(
-        "DELETE FROM character_inventory WHERE character_id = $1 AND item_id = $2",
-        char_id, item_id,
-    )
+# NOTA (Fase I3): Los endpoints de inventario de personaje
+# (GET/POST/PUT/DELETE /characters/{id}/inventory) viven ahora exclusivamente
+# en routers/inventory.py, que devuelve el conjunto completo de campos
+# (slot, sintonía, cargas, tipo correcto) y aplica las reglas de equipo.
+# Aquí se eliminaron las versiones duplicadas para evitar rutas en conflicto.
 
 
 def _character_select() -> str:

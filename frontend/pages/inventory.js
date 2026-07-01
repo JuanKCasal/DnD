@@ -19,6 +19,21 @@ const TYPE_ICON = {
   treasure: '💎', vehicle: '🚗', other: '📦',
 };
 
+/* ── Slots de equipo ───────────────────────────────────────────── */
+const SLOT_LABELS = {
+  head: 'Cabeza', neck: 'Cuello', body: 'Cuerpo', cloak: 'Espalda (capa)',
+  hands: 'Manos', ring_left: 'Anillo izq.', ring_right: 'Anillo der.',
+  waist: 'Cintura', feet: 'Pies', main_hand: 'Mano principal',
+  off_hand: 'Mano secundaria', back: 'Espalda',
+};
+const SLOT_OPTIONS = [
+  ['main_hand', 'Mano principal'], ['off_hand', 'Mano secundaria'],
+  ['head', 'Cabeza'], ['neck', 'Cuello'], ['body', 'Cuerpo'],
+  ['cloak', 'Espalda (capa)'], ['hands', 'Manos'], ['ring_left', 'Anillo izq.'],
+  ['ring_right', 'Anillo der.'], ['waist', 'Cintura'], ['feet', 'Pies'],
+  ['back', 'Espalda'],
+];
+
 /* ═══════════════════════════════════════════════════════════════
    MAIN RENDER
 ═══════════════════════════════════════════════════════════════ */
@@ -142,6 +157,17 @@ export async function render(container) {
         </div>`;
         return;
       }
+      // Contador de sintonía (máx 3)
+      const attunedCount = items.filter(i => i.attuned).length;
+      const counter = document.createElement('div');
+      counter.style.cssText = 'display:flex;justify-content:flex-end;margin-bottom:12px;';
+      const chip = document.createElement('span');
+      chip.style.cssText = `padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;
+        background:var(--gold-glow);color:var(--gold);border:1px solid var(--gold-dim)44;`;
+      chip.textContent = `🔮 Sintonía ${attunedCount}/3`;
+      counter.appendChild(chip);
+      el.appendChild(counter);
+
       const equipped = items.filter(i => i.equipped);
       const unequipped = items.filter(i => !i.equipped);
       if (equipped.length) {
@@ -429,8 +455,11 @@ export async function render(container) {
     const meta = document.createElement('div');
     meta.style.cssText = 'font-size:12px;color:var(--ink-muted);margin-top:2px;';
     const parts = [r.label];
+    if (item.equipped && item.slot) parts.push(`🧷 ${SLOT_LABELS[item.slot] || item.slot}`);
+    if (item.damage_dice) parts.push(`⚔ ${item.damage_dice}${item.damage_type ? ' ' + item.damage_type : ''}`);
+    if (item.ac_base != null) parts.push(`🛡 CA ${item.ac_base}`);
     if (item.is_magical) parts.push('✨ Mágico');
-    if (item.requires_attunement) parts.push('🔮 Sintonía');
+    if (item.requires_attunement) parts.push(item.attuned ? '🔮 Sintonizado' : '🔮 Sintonía');
     if (item.value_gp) parts.push(`${item.value_gp} PO`);
     meta.textContent = parts.join(' · ');
 
@@ -457,13 +486,41 @@ export async function render(container) {
       `;
       equipBtn.textContent = item.equipped ? 'Desequipar' : 'Equipar';
       equipBtn.addEventListener('click', async () => {
-        try {
-          await api.put(`/characters/${ownerId}/inventory/${item.item_id}`, { equipped: !item.equipped });
-          toast.success(item.equipped ? 'Item desequipado' : 'Item equipado');
-          loadCharInventory(ownerId, parentEl);
-        } catch (e) { toast.error(e.message); }
+        if (item.equipped) {
+          try {
+            await api.put(`/characters/${ownerId}/inventory/${item.item_id}`, { equipped: false });
+            toast.success('Item desequipado');
+            loadCharInventory(ownerId, parentEl);
+          } catch (e) { toast.error(e.message); }
+        } else {
+          openEquipModal(ownerId, item, parentEl);
+        }
       });
       actions.appendChild(equipBtn);
+
+      // Botón de sintonía (solo objetos que la requieren)
+      if (item.requires_attunement) {
+        const attuneBtn = document.createElement('button');
+        attuneBtn.style.cssText = `
+          padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;
+          background:${item.attuned ? 'rgba(163,53,238,0.14)' : 'var(--stone-light)'};
+          color:${item.attuned ? '#a335ee' : 'var(--ink-muted)'};
+          border:1px solid ${item.attuned ? '#a335ee55' : 'var(--border)'};
+          transition:all var(--dur-fast);
+        `;
+        attuneBtn.textContent = item.attuned ? 'Quitar sintonía' : 'Sintonizar';
+        attuneBtn.addEventListener('click', async () => {
+          try {
+            await api.put(`/characters/${ownerId}/inventory/${item.item_id}`, { attuned: !item.attuned });
+            toast.success(item.attuned ? 'Sintonía retirada' : 'Objeto sintonizado');
+            loadCharInventory(ownerId, parentEl);
+          } catch (e) {
+            const msg = (e && e.message) ? e.message : 'Error';
+            toast.error(msg.includes('LIMIT') || msg.includes('3 objetos') ? 'Máximo 3 objetos sintonizados' : msg);
+          }
+        });
+        actions.appendChild(attuneBtn);
+      }
     }
 
     const removeBtn = document.createElement('button');
@@ -600,6 +657,66 @@ export async function render(container) {
     el.style.cssText = `padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;color:${color};background:${bg};border:1px solid ${color}33;`;
     el.textContent = text;
     return el;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     MODAL: Equipar item (elegir slot)
+  ═══════════════════════════════════════════════════════════════ */
+  function _suggestSlot(item) {
+    if (item.type === 'weapon') return 'main_hand';
+    if (item.type === 'armor') return item.armor_category === 'Shield' ? 'off_hand' : 'body';
+    if (item.type === 'ring') return 'ring_left';
+    return 'main_hand';
+  }
+
+  function openEquipModal(ownerId, item, parentEl) {
+    const overlay = buildOverlay();
+    const modal = buildModal(`Equipar «${item.custom_name || item.name}»`);
+
+    const label = document.createElement('label');
+    label.style.cssText = 'display:block;margin-bottom:6px;font-size:11px;color:var(--ink-muted);font-weight:600;letter-spacing:0.05em;';
+    label.textContent = 'RANURA DE EQUIPO';
+    modal.appendChild(label);
+
+    const sel = document.createElement('select');
+    SLOT_OPTIONS.forEach(([val, lbl]) => {
+      const o = document.createElement('option');
+      o.value = val; o.textContent = lbl;
+      sel.appendChild(o);
+    });
+    applyInputStyle(sel);
+    sel.value = _suggestSlot(item);
+    modal.appendChild(sel);
+
+    const hint = document.createElement('div');
+    hint.style.cssText = 'font-size:11px;color:var(--ink-faint);margin-top:8px;line-height:1.5;';
+    hint.textContent = 'Un arma a dos manos ocupa la mano principal y bloquea la secundaria; un escudo o arma en la mano secundaria desaloja las armas a dos manos.';
+    modal.appendChild(hint);
+
+    const footer = document.createElement('div');
+    footer.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;margin-top:18px;';
+    const cancelBtn = buildBtn('Cancelar', false);
+    const okBtn = buildBtn('Equipar', true);
+    footer.appendChild(cancelBtn);
+    footer.appendChild(okBtn);
+    modal.appendChild(footer);
+
+    const close = () => overlay.remove();
+    cancelBtn.addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+    okBtn.addEventListener('click', async () => {
+      okBtn.disabled = true;
+      try {
+        await api.put(`/characters/${ownerId}/inventory/${item.item_id}`, { equipped: true, slot: sel.value });
+        toast.success('Item equipado');
+        close();
+        loadCharInventory(ownerId, parentEl);
+      } catch (e) { toast.error(e.message); okBtn.disabled = false; }
+    });
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
   }
 
   /* ═══════════════════════════════════════════════════════════════

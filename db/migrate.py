@@ -112,14 +112,21 @@ async def run_migration(filepath: Path):
 
 
 async def main():
+    import sys
+
     print("=" * 60)
     print("  DnD Community Manager — Database Migration")
     print("=" * 60)
     print(f"  DB: {DATABASE_URL[:50]}...")
 
-    migration_file = MIGRATIONS_DIR / "001_initial_schema.sql"
+    # Nombre de migración por argumento; por defecto el schema inicial.
+    fname = sys.argv[1] if len(sys.argv) > 1 else "001_initial_schema.sql"
+    if not fname.endswith(".sql"):
+        fname += ".sql"
+    migration_file = MIGRATIONS_DIR / fname
     if not migration_file.exists():
         print(f"\n❌ No encontrado: {migration_file}")
+        print(f"   Migraciones disponibles: {[p.name for p in sorted(MIGRATIONS_DIR.glob('*.sql'))]}")
         return
 
     success = await run_migration(migration_file)
