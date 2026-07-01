@@ -724,6 +724,71 @@ export async function render(container) {
     combatSection.appendChild(combatGrid);
     p1.appendChild(combatSection);
 
+    /* Combate calculado desde el equipo (Fase I4) */
+    const derivedSection = document.createElement('div');
+    derivedSection.style.cssText = 'margin-top:20px;';
+    derivedSection.appendChild(sectionTitle('Combate según equipo'));
+    const derivedBody = document.createElement('div');
+    derivedBody.style.cssText = 'font-size:13px;color:var(--ink-muted);';
+    derivedBody.textContent = 'Calculando...';
+    derivedSection.appendChild(derivedBody);
+    p1.appendChild(derivedSection);
+    renderDerivedCombat(c.id, derivedBody);
+
+    async function renderDerivedCombat(charId, target) {
+      try {
+        const res = await api.get(`/characters/${charId}/combat`);
+        const d = res.data;
+        target.innerHTML = '';
+
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;';
+        const badge = (label, val, sub) => {
+          const b = document.createElement('div');
+          b.style.cssText = 'flex:1;min-width:90px;background:var(--stone-light);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;';
+          b.innerHTML = `<div style="font-size:20px;font-weight:700;color:var(--gold);font-family:var(--font-mono);">${val}</div>
+            <div style="font-size:9px;color:var(--ink-muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:3px;">${label}</div>
+            ${sub ? `<div style="font-size:9px;color:var(--ink-faint);margin-top:2px;line-height:1.3;">${sub}</div>` : ''}`;
+          return b;
+        };
+        const spd = d.speed.total + ' ft' + (d.speed.penalty ? ` (${d.speed.penalty})` : '');
+        row.appendChild(badge('CA efectiva', d.ac.total,
+          d.ac.breakdown.map(x => `${x.source} ${x.value >= 0 ? '+' : ''}${x.value}`).join(' · ')));
+        row.appendChild(badge('Velocidad', spd, d.speed.reason || ''));
+        row.appendChild(badge('Sigilo', d.stealth_disadvantage ? 'Desv.' : 'OK',
+          d.stealth_disadvantage ? 'armadura ruidosa' : ''));
+        target.appendChild(row);
+
+        if (d.attacks.length) {
+          const at = document.createElement('div');
+          at.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
+          d.attacks.forEach(a => {
+            const ar = document.createElement('div');
+            ar.style.cssText = 'display:flex;justify-content:space-between;gap:8px;background:var(--stone-light);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;';
+            const dmgType = a.damage_type ? ' ' + a.damage_type : '';
+            ar.innerHTML = `<span style="color:var(--ink);font-weight:600;">${a.name}</span>
+              <span style="font-family:var(--font-mono);color:var(--ink-muted);">${a.attack_bonus} · ${a.damage}${dmgType}</span>`;
+            at.appendChild(ar);
+          });
+          target.appendChild(at);
+        } else {
+          const none = document.createElement('div');
+          none.style.cssText = 'font-size:12px;color:var(--ink-faint);';
+          none.textContent = 'Sin armas equipadas.';
+          target.appendChild(none);
+        }
+
+        if (d.notes && d.notes.length) {
+          const nt = document.createElement('div');
+          nt.style.cssText = 'font-size:10px;color:var(--ink-faint);margin-top:8px;line-height:1.4;';
+          nt.textContent = d.notes.join(' ');
+          target.appendChild(nt);
+        }
+      } catch (e) {
+        target.textContent = 'No se pudo calcular el combate.';
+      }
+    }
+
     /* ─── TAB 2: HABILIDADES ─── */
     const p2 = panels['habilidades'];
     p2.style.cssText = 'padding:24px 32px;display:none;';
