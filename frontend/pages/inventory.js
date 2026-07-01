@@ -157,6 +157,11 @@ export async function render(container) {
         </div>`;
         return;
       }
+      // Cartera + carga (Fase I5)
+      const walletEl = document.createElement('div');
+      el.appendChild(walletEl);
+      renderWallet(charId, walletEl);
+
       // Contador de sintonía (máx 3)
       const attunedCount = items.filter(i => i.attuned).length;
       const counter = document.createElement('div');
@@ -179,6 +184,135 @@ export async function render(container) {
     } catch (err) {
       el.innerHTML = `<div style="color:var(--crimson);padding:20px;">Error: ${err.message}</div>`;
     }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     Cartera del personaje + barra de carga (Fase I5)
+  ═══════════════════════════════════════════════════════════════ */
+  async function renderWallet(charId, target) {
+    target.innerHTML = '';
+    let data;
+    try { data = (await api.get(`/characters/${charId}/currency`)).data; }
+    catch (_) { return; }
+    const cur = data.currency || {};
+    const enc = data.encumbrance || {};
+
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'background:var(--stone);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:16px;';
+
+    const coinsRow = document.createElement('div');
+    coinsRow.style.cssText = 'display:flex;gap:12px;flex-wrap:wrap;align-items:center;';
+    [
+      { key: 'platinum', label: 'PP', color: '#b0c4de' },
+      { key: 'gold', label: 'PO', color: '#ffd700' },
+      { key: 'electrum', label: 'PE', color: '#7fffd4' },
+      { key: 'silver', label: 'PA', color: '#c0c0c0' },
+      { key: 'copper', label: 'PC', color: '#b87333' },
+    ].forEach(({ key, label, color }) => {
+      const chip = document.createElement('div');
+      chip.style.cssText = 'display:flex;align-items:center;gap:6px;';
+      chip.innerHTML = `<span style="width:26px;height:26px;border-radius:50%;background:${color}22;border:2px solid ${color};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:${color};">${label}</span>
+        <span style="font-family:var(--font-mono);font-size:15px;font-weight:600;color:var(--ink);">${(cur[key] || 0).toLocaleString()}</span>`;
+      coinsRow.appendChild(chip);
+    });
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn';
+    editBtn.style.cssText = 'margin-left:auto;white-space:nowrap;font-size:12px;';
+    editBtn.textContent = '💰 Editar';
+    editBtn.addEventListener('click', () => openCharCurrencyModal(charId, cur, () => renderWallet(charId, target)));
+    coinsRow.appendChild(editBtn);
+    wrap.appendChild(coinsRow);
+
+    if (enc.capacity) {
+      const pct = Math.min(100, Math.round((enc.carried / enc.capacity) * 100));
+      const colorByStatus = { 'normal': 'var(--success)', 'cargado': 'var(--warning)', 'muy cargado': '#c86a1a', 'sobrecargado': 'var(--crimson)' };
+      const c = colorByStatus[enc.status] || 'var(--gold)';
+      const bar = document.createElement('div');
+      bar.style.cssText = 'margin-top:14px;';
+      bar.innerHTML = `
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink-muted);margin-bottom:4px;">
+          <span>Carga: ${enc.carried} / ${enc.capacity} lb</span>
+          <span style="color:${c};font-weight:600;text-transform:capitalize;">${enc.status}${enc.speed_penalty ? ` (${enc.speed_penalty} ft)` : ''}</span>
+        </div>
+        <div style="height:6px;background:var(--stone-light);border-radius:3px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:${c};transition:width var(--dur-normal);"></div>
+        </div>`;
+      wrap.appendChild(bar);
+    }
+    target.appendChild(wrap);
+  }
+
+  function openCharCurrencyModal(charId, current, onDone) {
+    const overlay = buildOverlay();
+    const modal = buildModal('💰 Editar monedas');
+    const values = { copper: 0, silver: 0, electrum: 0, gold: 0, platinum: 0, ...current };
+    [
+      { key: 'platinum', label: 'Platino (PP)' }, { key: 'gold', label: 'Oro (PO)' },
+      { key: 'electrum', label: 'Electro (PE)' }, { key: 'silver', label: 'Plata (PA)' },
+      { key: 'copper', label: 'Cobre (PC)' },
+    ].forEach(({ key, label }) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:12px;margin-bottom:12px;';
+      const lbl = document.createElement('label');
+      lbl.style.cssText = 'font-size:13px;color:var(--ink);min-width:120px;';
+      lbl.textContent = label;
+      const input = document.createElement('input');
+      input.type = 'number'; input.min = '0'; input.value = current[key] || 0;
+      applyInputStyle(input); input.style.width = '120px';
+      input.addEventListener('input', () => values[key] = parseInt(input.value) || 0);
+      row.appendChild(lbl); row.appendChild(input); modal.appendChild(row);
+    });
+    const footer = document.createElement('div');
+    footer.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;margin-top:16px;';
+    const cancelBtn = buildBtn('Cancelar', false);
+    const saveBtn = buildBtn('Guardar', true);
+    footer.appendChild(cancelBtn); footer.appendChild(saveBtn); modal.appendChild(footer);
+    const close = () => overlay.remove();
+    cancelBtn.addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    saveBtn.addEventListener('click', async () => {
+      saveBtn.disabled = true;
+      try {
+        await api.put(`/characters/${charId}/currency`, values);
+        toast.success('Monedas actualizadas');
+        close(); if (onDone) onDone();
+      } catch (e) { toast.error(e.message); saveBtn.disabled = false; }
+    });
+    overlay.appendChild(modal); document.body.appendChild(overlay);
+  }
+
+  function openSellModal(charId, item, parentEl) {
+    const overlay = buildOverlay();
+    const modal = buildModal(`Vender «${item.custom_name || item.name}»`);
+    const unit = item.value_gp ? (item.value_gp / 2) : 0;
+    const info = document.createElement('div');
+    info.style.cssText = 'font-size:12px;color:var(--ink-muted);margin-bottom:12px;';
+    info.textContent = `Tienes ${item.quantity}. Precio de venta: ${unit} PO c/u (50% del valor).`;
+    modal.appendChild(info);
+    const lbl = document.createElement('label');
+    lbl.style.cssText = 'display:block;margin-bottom:6px;font-size:11px;color:var(--ink-muted);font-weight:600;';
+    lbl.textContent = 'CANTIDAD A VENDER';
+    const qty = document.createElement('input');
+    qty.type = 'number'; qty.min = '1'; qty.max = String(item.quantity); qty.value = '1';
+    applyInputStyle(qty);
+    modal.appendChild(lbl); modal.appendChild(qty);
+    const footer = document.createElement('div');
+    footer.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;margin-top:16px;';
+    const cancelBtn = buildBtn('Cancelar', false);
+    const okBtn = buildBtn('Vender', true);
+    footer.appendChild(cancelBtn); footer.appendChild(okBtn); modal.appendChild(footer);
+    const close = () => overlay.remove();
+    cancelBtn.addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    okBtn.addEventListener('click', async () => {
+      okBtn.disabled = true;
+      try {
+        await api.post(`/characters/${charId}/shop/sell`, { item_id: item.item_id, quantity: parseInt(qty.value) || 1 });
+        toast.success('Vendido');
+        close(); loadCharInventory(charId, parentEl);
+      } catch (e) { toast.error(e.message); okBtn.disabled = false; }
+    });
+    overlay.appendChild(modal); document.body.appendChild(overlay);
   }
 
   /* ═══════════════════════════════════════════════════════════════
@@ -521,6 +655,19 @@ export async function render(container) {
         });
         actions.appendChild(attuneBtn);
       }
+
+      // Vender (si el item tiene valor)
+      if (item.value_gp) {
+        const sellBtn = document.createElement('button');
+        sellBtn.style.cssText = `
+          padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;
+          background:var(--stone-light);color:var(--gold-dim);
+          border:1px solid var(--border);transition:all var(--dur-fast);
+        `;
+        sellBtn.textContent = '💰 Vender';
+        sellBtn.addEventListener('click', () => openSellModal(ownerId, item, parentEl));
+        actions.appendChild(sellBtn);
+      }
     }
 
     const removeBtn = document.createElement('button');
@@ -753,6 +900,19 @@ export async function render(container) {
     modal.appendChild(qtyLabel);
     modal.appendChild(qtyInput);
 
+    // Opción de compra (solo inventario de personaje)
+    let buyChk = null;
+    if (mode === 'character') {
+      const buyLabel = document.createElement('label');
+      buyLabel.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);cursor:pointer;margin-bottom:16px;';
+      buyChk = document.createElement('input');
+      buyChk.type = 'checkbox';
+      buyChk.style.accentColor = 'var(--gold)';
+      buyLabel.appendChild(buyChk);
+      buyLabel.appendChild(document.createTextNode('Comprar (descontar oro del personaje)'));
+      modal.appendChild(buyLabel);
+    }
+
     const footer = document.createElement('div');
     footer.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;';
     const cancelBtn = buildBtn('Cancelar', false);
@@ -812,12 +972,14 @@ export async function render(container) {
       if (!selectedItem) return;
       addBtn.disabled = true;
       try {
+        const buying = buyChk && buyChk.checked;
         const body = { item_id: selectedItem.id, quantity: parseInt(qtyInput.value) || 1 };
-        const path = mode === 'treasury'
-          ? `/campaigns/${ownerId}/treasury/items`
-          : `/characters/${ownerId}/inventory`;
+        let path;
+        if (mode === 'treasury') path = `/campaigns/${ownerId}/treasury/items`;
+        else if (buying) path = `/characters/${ownerId}/shop/buy`;
+        else path = `/characters/${ownerId}/inventory`;
         await api.post(path, body);
-        toast.success(`"${selectedItem.name}" añadido`);
+        toast.success(buying ? `"${selectedItem.name}" comprado` : `"${selectedItem.name}" añadido`);
         close();
         if (mode === 'treasury') loadTreasury(ownerId, parentEl);
         else loadCharInventory(ownerId, parentEl);

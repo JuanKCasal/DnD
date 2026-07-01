@@ -7,6 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from api.dependencies import get_current_user, get_db
 from api.db.helpers import error_response, item_response, list_response, log_event, paginate, records_to_list
 from api.db.kafka import TOPIC_INVENTORY_UPDATED, publish_event
+from api.services.economy import (
+    to_copper, from_copper, coin_weight, carrying_capacity, encumbrance, format_currency,
+)
 from api.models.inventory_model import (
     CurrencyUpdate, InventoryAdd, InventoryUpdate,
     ItemCreate, ItemUpdate, TreasuryAdd, TreasuryUpdate,
@@ -611,3 +614,194 @@ async def update_campaign_currency(
         "gold": body.gold, "silver": body.silver,
     })
     return item_response(dict(row))
+
+
+# ═══════════════════════════════════════════════════════
+#  CHARACTER CURRENCY / CARGA / TIENDA (Fase I5)
+# ═══════════════════════════════════════════════════════
+_ZERO_CURRENCY = {"copper": 0, "silver": 0, "electrum": 0, "gold": 0, "platinum": 0}
+
+
+async def _char_for_economy(conn, char_id):
+    return await conn.fetchrow(
+        "SELECT id, member_id, str AS str_score FROM characters WHERE id = $1 AND active = TRUE",
+        char_id,
+    )
+
+
+def _can_edit_char(current_user, member_id) -> bool:
+    return current_user["role"] in ("admin", "dm") or str(member_id) == str(current_user["id"])
+
+
+async def _read_currency(conn, char_id) -> dict:
+    row = await conn.fetchrow(
+        "SELECT copper, silver, electrum, gold, platinum FROM character_currency WHERE character_id = $1",
+        char_id,
+    )
+    return dict(row) if row else dict(_ZERO_CURRENCY)
+
+
+async def _write_currency(conn, char_id, currency: dict):
+    await conn.execute(
+        """
+        INSERT INTO character_currency (character_id, copper, silver, electrum, gold, platinum)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (character_id)
+        DO UPDATE SET copper=$2, silver=$3, electrum=$4, gold=$5, platinum=$6
+        """,
+        char_id, currency["copper"], currency["silver"], currency["electrum"],
+        currency["gold"], currency["platinum"],
+    )
+
+
+async def _inventory_weight(conn, char_id) -> float:
+    val = await conn.fetchval(
+        """
+        SELECT COALESCE(SUM(COALESCE(i.weight, 0) * ci.quantity), 0)
+        FROM character_inventory ci JOIN items i ON i.id = ci.item_id
+        WHERE ci.character_id = $1
+        """,
+        char_id,
+    )
+    return float(val or 0)
+
+
+@router.get("/characters/{char_id}/currency", response_model=dict)
+async def get_character_currency(
+    char_id: uuid.UUID,
+    conn: asyncpg.Connection = Depends(get_db),
+    _: dict = Depends(get_current_user),
+):
+    char = await _char_for_economy(conn, char_id)
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found")
+    currency = await _read_currency(conn, char_id)
+    total_weight = await _inventory_weight(conn, char_id) + coin_weight(currency)
+    return item_response({
+        "currency": currency,
+        "total_cp": to_copper(currency),
+        "formatted": format_currency(currency),
+        "coin_weight": coin_weight(currency),
+        "encumbrance": encumbrance(total_weight, char["str_score"]),
+    })
+
+
+@router.put("/characters/{char_id}/currency", response_model=dict)
+async def update_character_currency(
+    char_id: uuid.UUID,
+    body: CurrencyUpdate,
+    conn: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    char = await _char_for_economy(conn, char_id)
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found")
+    if not _can_edit_char(current_user, char["member_id"]):
+        raise HTTPException(status_code=403, detail="Cannot modify another player's currency")
+    currency = {"copper": body.copper, "silver": body.silver, "electrum": body.electrum,
+                "gold": body.gold, "platinum": body.platinum}
+    await _write_currency(conn, char_id, currency)
+    return item_response({"currency": currency, "formatted": format_currency(currency)})
+
+
+@router.post("/characters/{char_id}/shop/buy", response_model=dict)
+async def shop_buy(
+    char_id: uuid.UUID,
+    body: InventoryAdd,
+    conn: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    char = await _char_for_economy(conn, char_id)
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found")
+    if not _can_edit_char(current_user, char["member_id"]):
+        raise HTTPException(status_code=403, detail="Cannot modify another player's inventory")
+
+    item = await conn.fetchrow("SELECT id, name, value_gp FROM items WHERE id = $1", body.item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    if item["value_gp"] is None:
+        raise HTTPException(status_code=400, detail={
+            "code": "NO_PRICE", "message": "Este objeto no tiene precio de compra"})
+
+    qty = max(1, body.quantity or 1)
+    cost_cp = int(round(float(item["value_gp"]) * 100)) * qty
+
+    async with conn.transaction():
+        currency = await _read_currency(conn, char_id)
+        have = to_copper(currency)
+        if have < cost_cp:
+            raise HTTPException(status_code=400, detail={
+                "code": "INSUFFICIENT_FUNDS",
+                "message": "No tienes suficiente dinero para esta compra"})
+        await _write_currency(conn, char_id, from_copper(have - cost_cp))
+        await conn.execute(
+            """
+            INSERT INTO character_inventory (character_id, item_id, quantity)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (character_id, item_id)
+            DO UPDATE SET quantity = character_inventory.quantity + EXCLUDED.quantity
+            """,
+            char_id, body.item_id, qty,
+        )
+    new_currency = await _read_currency(conn, char_id)
+    await publish_event(TOPIC_INVENTORY_UPDATED, {
+        "event": "item_bought", "character_id": str(char_id),
+        "item_id": str(body.item_id), "quantity": qty, "spent_cp": cost_cp,
+    })
+    return item_response({"bought": item["name"], "quantity": qty,
+                          "spent_cp": cost_cp, "currency": new_currency,
+                          "formatted": format_currency(new_currency)})
+
+
+@router.post("/characters/{char_id}/shop/sell", response_model=dict)
+async def shop_sell(
+    char_id: uuid.UUID,
+    body: InventoryAdd,
+    conn: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    char = await _char_for_economy(conn, char_id)
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found")
+    if not _can_edit_char(current_user, char["member_id"]):
+        raise HTTPException(status_code=403, detail="Cannot modify another player's inventory")
+
+    item = await conn.fetchrow("SELECT id, name, value_gp FROM items WHERE id = $1", body.item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    qty = max(1, body.quantity or 1)
+    # Venta a mitad de precio (regla común de mercado)
+    gain_cp = int(round(float(item["value_gp"] or 0) * 100 * 0.5)) * qty
+
+    async with conn.transaction():
+        inv = await conn.fetchrow(
+            "SELECT quantity FROM character_inventory WHERE character_id = $1 AND item_id = $2",
+            char_id, body.item_id,
+        )
+        if not inv or inv["quantity"] < qty:
+            raise HTTPException(status_code=400, detail={
+                "code": "NOT_ENOUGH_ITEMS",
+                "message": "No tienes suficientes unidades para vender"})
+        if inv["quantity"] == qty:
+            await conn.execute(
+                "DELETE FROM character_inventory WHERE character_id = $1 AND item_id = $2",
+                char_id, body.item_id,
+            )
+        else:
+            await conn.execute(
+                "UPDATE character_inventory SET quantity = quantity - $3 "
+                "WHERE character_id = $1 AND item_id = $2",
+                char_id, body.item_id, qty,
+            )
+        currency = await _read_currency(conn, char_id)
+        await _write_currency(conn, char_id, from_copper(to_copper(currency) + gain_cp))
+    new_currency = await _read_currency(conn, char_id)
+    await publish_event(TOPIC_INVENTORY_UPDATED, {
+        "event": "item_sold", "character_id": str(char_id),
+        "item_id": str(body.item_id), "quantity": qty, "gained_cp": gain_cp,
+    })
+    return item_response({"sold": item["name"], "quantity": qty,
+                          "gained_cp": gain_cp, "currency": new_currency,
+                          "formatted": format_currency(new_currency)})
