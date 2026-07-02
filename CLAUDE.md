@@ -963,8 +963,21 @@ Luego `git add -A; git commit -m "feat: CM2 chat multi-canal (identidad de perso
 
 > Nota: implementado con **llamadas directas** en los endpoints (no requiere el consumidor Kafka). El puente Kafka→Discord queda para una iteración futura.
 
-### Fases CM4–CM6 — Pendientes
-Ver `PLAN_MEJORAS_COMUNIDAD.md`: CM4 Calendario & Eventos · CM5 Clanes como muro social · CM6 Salón de la Fama (premios + valoración de DMs).
+### Fase CM4 — Calendario & Eventos (muro Admin/DM) ✅ COMPLETADA (pendiente de desplegar)
+- [x] Migración `db/migrations/016_community_walls.sql` — modelo **unificado** (D4): `community_posts` (`board` events|hall|clan, `clan_id`, autor miembro/personaje, `title/body/image_url/item_id/event_date/pinned`, soft-delete), `community_comments`, `community_reactions`. Reutilizado por CM5 (clan) y CM6 (hall).
+- [x] Router `api/routers/community.py` (`/api/v1/community`): CRUD de posts por `board` + comentarios + reacción (toggle por personaje). **Permisos:** events/hall publican solo staff; clan solo miembros/staff; vista filtrada en backend. Registrado en `main.py`.
+- [x] Modelos `models/community.py` (`PostCreate/Update`, `CommentCreate`, `ReactionSet`).
+- [x] Frontend `frontend/pages/calendar.js` (`#/calendario`, "📅 Calendario & Eventos" habilitado): muro cronológico + sección **Próximos eventos** (por `event_date`), formulario de publicación (Admin/DM) con fecha/imagen/fijar, y comentarios por post.
+- [x] Verificado: `ast.parse` de modelo/router; `node --check` de `calendar.js`/`router.js`; registro en `main.py`.
+
+**⚠️ PENDIENTE DE DESPLIEGUE (CM4) — desde PowerShell:**
+```
+C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 016_community_walls
+```
+Luego `git add -A; git commit -m "feat: CM4 Calendario & Eventos (muro unificado community_posts)"; git push origin main`.
+
+### Fases CM5–CM6 — Pendientes
+Ver `PLAN_MEJORAS_COMUNIDAD.md`: CM5 Clanes como muro social (reutiliza `community_posts` board=clan) · CM6 Salón de la Fama (premios + valoración de DMs).
 
 ---
 
