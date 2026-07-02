@@ -12,6 +12,7 @@ class SessionCreate(BaseModel):
     summary: Optional[str] = None
     highlights: Optional[list[str]] = None
     xp_awarded: int = 0
+    milestone_level: Optional[int] = None
     next_session_date: Optional[datetime] = None
 
 
@@ -22,6 +23,7 @@ class SessionUpdate(BaseModel):
     summary: Optional[str] = None
     highlights: Optional[list[str]] = None
     xp_awarded: Optional[int] = None
+    milestone_level: Optional[int] = None
     next_session_date: Optional[datetime] = None
 
 
@@ -35,6 +37,7 @@ class SessionOut(BaseModel):
     summary: Optional[str] = None
     highlights: Optional[list[str]] = None
     xp_awarded: int
+    milestone_level: Optional[int] = None
     next_session_date: Optional[datetime] = None
     created_by: UUID
     created_at: datetime

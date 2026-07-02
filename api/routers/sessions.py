@@ -37,8 +37,8 @@ async def list_sessions(
     rows = await conn.fetch(
         f"""
         SELECT s.id, s.campaign_id, s.session_number, s.title, s.date,
-               s.duration_min, s.xp_awarded, s.created_by, s.created_at,
-               s.next_session_date
+               s.duration_min, s.xp_awarded, s.milestone_level, s.created_by,
+               s.created_at, s.next_session_date
         FROM sessions s
         {where}
         ORDER BY s.session_number DESC
@@ -78,8 +78,8 @@ async def create_session(
         """
         INSERT INTO sessions (
             id, campaign_id, session_number, title, date, duration_min,
-            summary, highlights, xp_awarded, next_session_date, created_by
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+            summary, highlights, xp_awarded, milestone_level, next_session_date, created_by
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
         """,
         session_id,
         body.campaign_id,
@@ -90,6 +90,7 @@ async def create_session(
         body.summary,
         highlights,
         body.xp_awarded,
+        body.milestone_level,
         body.next_session_date,
         current_user["id"],
     )

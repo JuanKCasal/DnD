@@ -4,13 +4,31 @@ import { auth } from '../js/auth.js';
 
 /* ─── STATUS CONFIG ─────────────────────────────────────────────── */
 const STATUS_CONFIG = {
+  planning:  { label: 'Planificación', color: 'var(--gold-dim)', border: 'var(--gold-dim)' },
   active:    { label: 'Activa',     color: 'var(--gold)',    border: 'var(--gold)' },
   paused:    { label: 'En pausa',   color: 'var(--crimson)', border: 'var(--crimson)' },
+  on_hiatus: { label: 'En hiato',   color: 'var(--crimson)', border: 'var(--crimson)' },
   completed: { label: 'Completada', color: 'var(--success)', border: 'var(--success)' },
   archived:  { label: 'Archivada',  color: 'var(--ink-muted)', border: 'var(--border)' },
 };
 
 const SYSTEMS = ['D&D 5e', 'Pathfinder 2e', 'Call of Cthulhu', 'Vampire: The Masquerade', 'Cyberpunk RED', 'Other'];
+const RULESETS = [
+  { value: 'dnd_5e_2014', label: "D&D 5e (2014)" },
+  { value: 'dnd_5e_2024', label: "D&D 5e (2024)" },
+  { value: 'dnd_5e_homebrew', label: 'D&D 5e (Homebrew)' },
+];
+const FREQUENCIES = [
+  { value: '', label: '—' },
+  { value: 'weekly', label: 'Semanal' },
+  { value: 'biweekly', label: 'Quincenal' },
+  { value: 'monthly', label: 'Mensual' },
+  { value: 'irregular', label: 'Irregular' },
+];
+const LEVELING = [
+  { value: 'xp', label: 'Puntos de experiencia (XP)' },
+  { value: 'milestone', label: 'Hitos (Milestone)' },
+];
 
 /* ─── MAIN RENDER ───────────────────────────────────────────────── */
 export async function render(container) {
@@ -53,7 +71,7 @@ export async function render(container) {
   const filters = document.createElement('div');
   filters.style.cssText = 'display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap;';
 
-  const allStatuses = ['all', 'active', 'paused', 'completed', 'archived'];
+  const allStatuses = ['all', 'planning', 'active', 'paused', 'on_hiatus', 'completed', 'archived'];
   const filterLabels = { all: 'Todas', ...Object.fromEntries(Object.entries(STATUS_CONFIG).map(([k, v]) => [k, v.label])) };
 
   let activeFilter = 'all';
@@ -180,13 +198,14 @@ export async function render(container) {
       world.textContent = '🌍 ' + c.world_name;
       meta.appendChild(world);
     }
-
-    /* Description */
-    if (c.description) {
-      const desc = document.createElement('p');
-      desc.style.cssText = 'font-size:13px;color:var(--ink-muted);line-height:1.5;margin:0 0 16px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;';
-      desc.textContent = c.description;
-      card.appendChild(desc);
+    if (c.start_level || c.current_level) {
+      const lvl = document.createElement('span');
+      lvl.style.cssText = 'background:var(--stone-light);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);';
+      const cur = c.current_level ?? c.start_level ?? 1;
+      const tgt = c.target_end_level;
+      lvl.textContent = tgt ? `Niv ${cur}→${tgt}` : `Niv ${cur}`;
+      lvl.title = c.leveling_method === 'milestone' ? 'Progresión por hitos' : 'Progresión por XP';
+      meta.appendChild(lvl);
     }
 
     /* Footer: member count + date */
@@ -206,7 +225,28 @@ export async function render(container) {
 
     card.appendChild(badge);
     card.appendChild(name);
+    if (c.subtitle) {
+      const sub = document.createElement('div');
+      sub.style.cssText = 'font-family:var(--font-body);font-style:italic;font-size:13px;color:var(--ink-muted);margin:-2px 0 10px;padding-right:80px;';
+      sub.textContent = c.subtitle;
+      card.appendChild(sub);
+    }
     card.appendChild(meta);
+
+    /* Tone + theme chips */
+    const tags = [...(c.tone ?? []), ...(c.themes ?? [])];
+    if (tags.length) {
+      const chipRow = document.createElement('div');
+      chipRow.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;';
+      tags.slice(0, 6).forEach(t => {
+        const chip = document.createElement('span');
+        chip.style.cssText = 'font-size:10px;font-family:var(--font-ui);text-transform:uppercase;letter-spacing:0.05em;color:var(--gold-dim);border:1px solid var(--gold-glow);background:var(--gold-glow);padding:2px 8px;border-radius:10px;';
+        chip.textContent = t;
+        chipRow.appendChild(chip);
+      });
+      card.appendChild(chipRow);
+    }
+
     if (c.description) {
       const desc = document.createElement('p');
       desc.style.cssText = 'font-size:13px;color:var(--ink-muted);line-height:1.5;margin:0 0 16px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;';
@@ -277,6 +317,7 @@ export async function render(container) {
     const fields = [
       { label: 'Nombre *', id: 'camp-name', type: 'text', value: campaign?.name ?? '', placeholder: 'La Maldición de Strahd' },
       { label: 'Slug *', id: 'camp-slug', type: 'text', value: campaign?.slug ?? '', placeholder: 'maldicion-strahd' },
+      { label: 'Subtítulo', id: 'camp-subtitle', type: 'text', value: campaign?.subtitle ?? '', placeholder: 'El terror acecha en la niebla' },
       { label: 'Mundo / Setting', id: 'camp-world', type: 'text', value: campaign?.world_name ?? '', placeholder: 'Barovia' },
       { label: 'Descripción', id: 'camp-desc', type: 'textarea', value: campaign?.description ?? '', placeholder: 'Una historia de terror gótico...' },
     ];
@@ -349,6 +390,47 @@ export async function render(container) {
       form.appendChild(stGroup);
     }
 
+    /* ── Helpers de formulario ── */
+    const sectionStyle = 'font-family:var(--font-ui);font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--gold);margin:8px 0 -4px;border-top:1px solid var(--border);padding-top:16px;';
+    const lblStyle = 'display:block;font-size:11px;font-weight:600;color:var(--ink-muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;';
+    const makeLabel = (text) => { const l = document.createElement('label'); l.style.cssText = lblStyle; l.textContent = text; return l; };
+    const makeSelect = (id, opts, selected) => {
+      const s = document.createElement('select'); s.id = id; s.className = 'input';
+      opts.forEach(o => { const op = document.createElement('option'); op.value = o.value; op.textContent = o.label; op.selected = String(selected) === String(o.value); s.appendChild(op); });
+      return s;
+    };
+    const makeInput = (id, value, placeholder, type = 'text') => {
+      const i = document.createElement('input'); i.id = id; i.className = 'input'; i.type = type;
+      i.value = value ?? ''; if (placeholder) i.placeholder = placeholder;
+      if (type === 'number') { i.min = '1'; i.max = '20'; }
+      return i;
+    };
+    const groupEl = (...els) => { const g = document.createElement('div'); els.forEach(e => g.appendChild(e)); return g; };
+    const sectionHeader = (text) => { const h = document.createElement('div'); h.style.cssText = sectionStyle; h.textContent = text; return h; };
+
+    /* ── Sección: Progresión (guía §2, §14) ── */
+    form.appendChild(sectionHeader('Progresión'));
+    const lvlRow = document.createElement('div');
+    lvlRow.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;';
+    lvlRow.appendChild(groupEl(makeLabel('Nivel inicial'), makeInput('camp-start-level', campaign?.start_level ?? 1, '1', 'number')));
+    lvlRow.appendChild(groupEl(makeLabel('Nivel actual'), makeInput('camp-current-level', campaign?.current_level ?? 1, '1', 'number')));
+    lvlRow.appendChild(groupEl(makeLabel('Nivel objetivo'), makeInput('camp-target-level', campaign?.target_end_level ?? '', '20', 'number')));
+    form.appendChild(lvlRow);
+    form.appendChild(groupEl(makeLabel('Método de progresión'), makeSelect('camp-leveling', LEVELING, campaign?.leveling_method ?? 'xp')));
+
+    /* ── Sección: Sistema y reglas de mesa (guía §3) ── */
+    form.appendChild(sectionHeader('Sistema y reglas de mesa'));
+    form.appendChild(groupEl(makeLabel('Edición de reglas'), makeSelect('camp-ruleset', RULESETS, campaign?.ruleset ?? 'dnd_5e_2014')));
+    form.appendChild(groupEl(makeLabel('Frecuencia de sesiones'), makeSelect('camp-frequency', FREQUENCIES, campaign?.session_frequency ?? '')));
+    form.appendChild(groupEl(makeLabel('Tono (separado por comas)'), makeInput('camp-tone', (campaign?.tone ?? []).join(', '), 'heroico, oscuro, exploración')));
+    form.appendChild(groupEl(makeLabel('Temas (separado por comas)'), makeInput('camp-themes', (campaign?.themes ?? []).join(', '), 'venganza, redención')));
+    form.appendChild(groupEl(makeLabel('Reglas variantes (separado por comas)'), makeInput('camp-variant', (campaign?.variant_rules ?? []).join(', '), 'Flanking, Feats, Multiclassing')));
+    const hrArea = document.createElement('textarea');
+    hrArea.id = 'camp-houserules'; hrArea.className = 'input'; hrArea.rows = 3;
+    hrArea.style.cssText = 'resize:vertical;min-height:64px;';
+    hrArea.value = (campaign?.house_rules ?? []).map(r => (r.description ? `${r.title}: ${r.description}` : r.title)).join('\n');
+    form.appendChild(groupEl(makeLabel('Reglas caseras (una por línea — "Título: descripción")'), hrArea));
+
     /* Auto-generate slug */
     const nameInput = form.querySelector('#camp-name');
     const slugInput = form.querySelector('#camp-slug');
@@ -381,14 +463,45 @@ export async function render(container) {
       const world  = form.querySelector('#camp-world').value.trim();
       const desc   = form.querySelector('#camp-desc').value.trim();
       const system = form.querySelector('#camp-system').value;
+      const subtitle = form.querySelector('#camp-subtitle').value.trim();
 
       if (!name || !slug) { toast.error('Campos requeridos', 'Nombre y slug son obligatorios'); return; }
+
+      const toArr = (s) => s.split(',').map(x => x.trim()).filter(Boolean);
+      const numOrNull = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : null; };
+      const parseHouseRules = (txt) => txt.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+        const idx = l.indexOf(':');
+        return idx >= 0
+          ? { category: 'other', title: l.slice(0, idx).trim(), description: l.slice(idx + 1).trim(), active: true }
+          : { category: 'other', title: l, description: '', active: true };
+      });
+
+      const startLevel = numOrNull(form.querySelector('#camp-start-level').value) ?? 1;
+      const currentLevel = numOrNull(form.querySelector('#camp-current-level').value) ?? 1;
+      const targetLevel = numOrNull(form.querySelector('#camp-target-level').value);
+      if (currentLevel < startLevel) { toast.error('Niveles inválidos', 'El nivel actual no puede ser menor que el inicial'); return; }
+      if (targetLevel !== null && targetLevel < currentLevel) { toast.error('Niveles inválidos', 'El nivel objetivo no puede ser menor que el actual'); return; }
 
       saveBtn.disabled = true;
       saveBtn.textContent = 'Guardando...';
 
       try {
-        const body = { name, slug, system, description: desc || null, world_name: world || null };
+        const body = {
+          name, slug, system,
+          subtitle: subtitle || null,
+          description: desc || null,
+          world_name: world || null,
+          start_level: startLevel,
+          current_level: currentLevel,
+          target_end_level: targetLevel,
+          leveling_method: form.querySelector('#camp-leveling').value,
+          ruleset: form.querySelector('#camp-ruleset').value,
+          session_frequency: form.querySelector('#camp-frequency').value || null,
+          tone: toArr(form.querySelector('#camp-tone').value),
+          themes: toArr(form.querySelector('#camp-themes').value),
+          variant_rules: toArr(form.querySelector('#camp-variant').value),
+          house_rules: parseHouseRules(form.querySelector('#camp-houserules').value),
+        };
         if (isEdit) {
           const status = form.querySelector('#camp-status')?.value;
           if (status) body.status = status;

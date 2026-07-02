@@ -291,7 +291,7 @@ Items deshabilitados: badge "Próximamente", `cursor:not-allowed`, no clickeable
 ```sql
 member_role:     'admin' | 'dm' | 'player'
 clan_role:       'leader' | 'officer' | 'veteran' | 'member' | 'initiate'
-campaign_status: 'active' | 'paused' | 'completed' | 'archived'
+campaign_status: 'planning' | 'active' | 'paused' | 'on_hiatus' | 'completed' | 'archived'  -- planning/on_hiatus añadidos en C1 (007)
 quest_status:    'active' | 'completed' | 'failed' | 'abandoned'
 location_type:   'city' | 'dungeon' | 'wilderness' | 'plane' | 'region' | 'poi'
 npc_relationship:'ally' | 'enemy' | 'neutral' | 'unknown'
@@ -320,7 +320,10 @@ clan_members        (clan_id, member_id PK, clan_role, title, contribution_pts, 
 clan_invitations    (id, clan_id, invited_member_id, invited_by, status::invite_status, resolved_at)
 
 campaigns           (id, name, slug UNIQUE, dm_id→members, system, status::campaign_status, description,
-                     lore, cover_image_url, is_public, world_name, setting, start_date, end_date)
+                     lore, cover_image_url, is_public, world_name, setting, start_date, end_date,
+                     subtitle, tone TEXT[], themes TEXT[], start_level, current_level, target_end_level,
+                     session_frequency, leveling_method (xp|milestone), ruleset (dnd_5e_2014|2024|homebrew),
+                     house_rules JSONB, variant_rules TEXT[], banner_image_url)   -- Fase C1 (007)
 campaign_members    (campaign_id, member_id PK, joined_at)
 
 characters          (id, member_id→members, campaign_id→campaigns, name, race, subrace, class, subclass,
@@ -332,10 +335,12 @@ characters          (id, member_id→members, campaign_id→campaigns, name, rac
                      portrait_url, backstory, personality_traits, ideals, bonds, flaws, notes,
                      active, created_at)
                      -- H6: eliminadas spells_known (JSONB) y cantrips_known (TEXT[]); repertorio en character_spells
-character_currency  (character_id→characters PK, pp, gp, ep, sp, cp)
+character_currency  (character_id→characters PK, copper, silver, electrum, gold, platinum)
+                     -- ⚠️ columnas reales: copper/silver/electrum/gold/platinum (NO pp/gp/ep/sp/cp)
 
-sessions            (id, campaign_id→campaigns, session_number AUTO, title, date, duration_minutes,
-                     summary, highlights TEXT[], created_by→members)
+sessions            (id, campaign_id→campaigns, session_number AUTO, title, date, duration_min,
+                     summary, highlights TEXT[], xp_awarded, milestone_level, next_session_date,
+                     created_by→members)   -- milestone_level expuesto en Fase C1
 session_attendance  (session_id, member_id PK, character_id→characters, present)
 
 items               (id, name, description, type::item_type, rarity::item_rarity, weight, value_gp,
@@ -343,7 +348,8 @@ items               (id, name, description, type::item_type, rarity::item_rarity
                      damage_dice, damage_type, ac_base, source_book, source_page)
 character_inventory (character_id, item_id PK, quantity, equipped, attuned, notes, custom_name)
 campaign_treasury   (campaign_id, item_id PK, quantity, notes, updated_at)
-campaign_currency   (campaign_id→campaigns PK, pp, gp, ep, sp, cp, notes)
+campaign_currency   (campaign_id→campaigns PK, copper, silver, electrum, gold, platinum, updated_at)
+                     -- ⚠️ columnas reales: copper/silver/electrum/gold/platinum (NO pp/gp/ep/sp/cp)
 
 spells              (id, name (ES), name_en, level 0-9, school::spell_school, casting_time(_type),
                      range_text/type/feet, comp_verbal/somatic/material, material_description,
@@ -705,6 +711,28 @@ C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/seed_spells
 C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 006_drop_deprecated_spell_columns
 ```
 Luego `git add -A; git commit -m "feat: H6 lanzamiento/descansos/concentración/upcasting + coste de componentes + limpieza"; git push origin main`.
+
+---
+
+## Sistema de Campañas — Fases C1–C7 (ver PLAN_MEJORAS_CAMPAÑAS.md)
+
+Rediseño integral de la gestión de campañas basado en `guides/dnd5e_campaigns_guide.md`: jerarquía narrativa, mundo vivo (NPCs/localizaciones/facciones/misiones ya existen en el schema sin exponer), balanceo de encuentros, progresión y visibilidad DM/jugador.
+
+### Fase C1 — Ficha de campaña/sesión enriquecida ✅ COMPLETADA (pendiente de desplegar)
+- [x] Migración `db/migrations/007_campaign_metadata.sql` — `ALTER TYPE campaign_status ADD VALUE 'planning'/'on_hiatus'` (idempotente); metadatos de campaña (`subtitle`, `tone[]`, `themes[]`, `start_level`, `current_level`, `target_end_level`, `session_frequency`, `leveling_method`, `ruleset`, `house_rules JSONB`, `variant_rules TEXT[]`, `banner_image_url`); CHECK de niveles (guía §17.3).
+- [x] Modelos: `CampaignCreate/Update/Out` amplían todos los campos con validadores (niveles 1–20, `leveling_method`, `ruleset`, `session_frequency`, `status`); `SessionCreate/Update/Out` exponen `milestone_level` (B2).
+- [x] Router `campaigns.py`: INSERT dinámico con casts (`::campaign_status`, `::jsonb`), UPDATE con cast de `house_rules::jsonb` y **validación de transición de estado** (`_STATUS_TRANSITIONS`, B5). `sessions.py`: `milestone_level` en INSERT y proyección de `list_sessions`.
+- [x] Frontend `campaigns.js`: modal con secciones **Progresión** (niveles, método) y **Sistema y reglas** (ruleset, frecuencia, tono/temas/variantes, editor simple de reglas caseras); estados `planning`/`on_hiatus` en filtros y badges; card muestra subtítulo, rango de nivel y chips de tono/tema; corregido bug de descripción duplicada.
+- [x] Verificado: `node --check` (lógica JS), `ast.parse` (modelos/routers), INSERT 25 columnas = 25 placeholders. Doc de moneda corregida (columnas reales `copper/silver/electrum/gold/platinum`).
+
+**⚠️ PENDIENTE DE DESPLIEGUE (C1) — desde PowerShell:**
+```
+C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 007_campaign_metadata
+```
+Luego `git add -A; git commit -m "feat: C1 metadatos de campaña + estados + milestone_level + validación de transición"; git push origin main`.
+
+### Fases C2–C7 — Pendientes
+Ver `PLAN_MEJORAS_CAMPAÑAS.md`: C2 aventuras + misiones · C3 NPCs/localizaciones/facciones · C4 bitácora + progresión · C5 bestiario + encuentros + balanceo · C6 combat tracker · C7 recompensas/mapas/visibilidad.
 
 ---
 

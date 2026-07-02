@@ -1,3 +1,4 @@
+import json
 import uuid
 
 import asyncpg
@@ -8,6 +9,32 @@ from api.db.helpers import item_response, list_response, log_event, paginate, re
 from api.models.campaign import CampaignCreate, CampaignUpdate
 
 router = APIRouter(prefix="/api/v1/campaigns", tags=["campaigns"])
+
+# Transiciones de estado permitidas (guía §2, máquina de estados). B5.
+# Mantener el mismo estado siempre es válido. 'paused'/'on_hiatus' son pausas;
+# 'archived' cubre el 'abandoned' de la guía y es reversible (restaurar).
+_STATUS_TRANSITIONS = {
+    "planning":  {"active", "archived"},
+    "active":    {"paused", "on_hiatus", "completed", "archived"},
+    "paused":    {"active", "completed", "archived"},
+    "on_hiatus": {"active", "completed", "archived"},
+    "completed": {"active", "archived"},
+    "archived":  {"active", "planning"},
+}
+
+# Columnas que requieren serialización/cast especial en INSERT/UPDATE dinámico.
+_JSONB_FIELDS = {"house_rules"}
+_STATUS_FIELDS = {"status"}
+
+
+def _assert_valid_transition(old: str, new: str) -> None:
+    if old == new:
+        return
+    if new not in _STATUS_TRANSITIONS.get(old, set()):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Transición de estado no permitida: {old} → {new}",
+        )
 
 
 @router.get("", response_model=dict)
@@ -68,9 +95,15 @@ async def create_campaign(
     campaign_id = uuid.uuid4()
     await conn.execute(
         """
-        INSERT INTO campaigns (id, name, slug, dm_id, system, description, lore,
-                               cover_image_url, is_public, world_name, setting, start_date)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        INSERT INTO campaigns (
+            id, name, slug, dm_id, system, description, lore,
+            cover_image_url, is_public, world_name, setting, start_date, status,
+            subtitle, tone, themes, start_level, current_level, target_end_level,
+            session_frequency, banner_image_url, leveling_method, ruleset,
+            house_rules, variant_rules
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::campaign_status,
+                $14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24::jsonb,$25)
         """,
         campaign_id,
         body.name,
@@ -84,6 +117,19 @@ async def create_campaign(
         body.world_name,
         body.setting,
         body.start_date,
+        body.status or "active",
+        body.subtitle,
+        body.tone or [],
+        body.themes or [],
+        body.start_level,
+        body.current_level,
+        body.target_end_level,
+        body.session_frequency,
+        body.banner_image_url,
+        body.leveling_method,
+        body.ruleset,
+        json.dumps(body.house_rules or []),
+        body.variant_rules or [],
     )
     # Add DM as member
     await conn.execute(
@@ -135,7 +181,7 @@ async def update_campaign(
     conn: asyncpg.Connection = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    row = await conn.fetchrow("SELECT dm_id FROM campaigns WHERE id = $1", campaign_id)
+    row = await conn.fetchrow("SELECT dm_id, status FROM campaigns WHERE id = $1", campaign_id)
     if not row:
         raise HTTPException(status_code=404, detail="Campaign not found")
 
@@ -146,12 +192,20 @@ async def update_campaign(
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
 
+    # Validar transición de estado (B5, guía §2).
+    if "status" in updates:
+        _assert_valid_transition(row["status"], updates["status"])
+
     set_clauses = []
     params = []
     for i, (k, v) in enumerate(updates.items(), start=1):
-        clause = f"{k} = ${i}"
-        if k == "status":
+        if k in _STATUS_FIELDS:
             clause = f"{k} = ${i}::campaign_status"
+        elif k in _JSONB_FIELDS:
+            clause = f"{k} = ${i}::jsonb"
+            v = json.dumps(v)
+        else:
+            clause = f"{k} = ${i}"
         set_clauses.append(clause)
         params.append(v)
 
