@@ -110,9 +110,19 @@
 .login-page {
   position: relative;
   overflow: hidden;
+  /* En móvil, 100vh excede el área visible (barra del navegador) y provoca
+     scroll + descentrado; dvh se ajusta al alto realmente disponible. */
+  min-height: 100vh;
+  min-height: 100dvh;
   background: radial-gradient(120% 120% at 50% 38%, #f7f5ee 0%, #f1efe7 46%, #e9e5d8 100%);
 }
 .login-card { position: relative; z-index: 2; }
+
+/* Móvil (< 465px): menos padding para que el formulario quepa sin scroll */
+@media (max-width: 465px) {
+  .login-page { padding: 12px; }
+  .login-card { padding: 28px 20px; }
+}
 
 .dnd-canvas {
   position: absolute; inset: 0;
