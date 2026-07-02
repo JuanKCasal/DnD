@@ -14,7 +14,7 @@ from api.dependencies import (
 from api.config import get_settings
 from api.db.helpers import item_response, log_event
 from api.services.community_feed import post_system_message
-from api.models.auth import LoginRequest, TokenResponse
+from api.models.auth import ChangePasswordRequest, LoginRequest, TokenResponse
 from api.models.member import MemberCreate
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -121,12 +121,77 @@ async def me(
         """
         SELECT m.id, m.username, m.email, m.display_name, m.avatar_url,
                m.role, m.rank_id, m.bio, m.timezone, m.discord_handle,
-               m.active, m.last_seen_at, m.created_at
+               m.active, m.last_seen_at, m.created_at, m.active_character_id,
+               r.id AS r_id, r.name AS r_name, r.slug AS r_slug,
+               r.color_hex AS r_color_hex, r.icon_url AS r_icon_url,
+               r.level AS r_level, r.xp_threshold AS r_xp_threshold
         FROM members m
+        LEFT JOIN ranks r ON r.id = m.rank_id
         WHERE m.id = $1
         """,
         current_user["id"],
     )
     if not row:
         raise HTTPException(status_code=404, detail="Member not found")
-    return item_response(dict(row))
+
+    data = dict(row)
+    if data.get("r_id"):
+        data["rank"] = {
+            "id": data.pop("r_id"),
+            "name": data.pop("r_name"),
+            "slug": data.pop("r_slug"),
+            "color_hex": data.pop("r_color_hex"),
+            "icon_url": data.pop("r_icon_url"),
+            "level": data.pop("r_level"),
+            "xp_threshold": data.pop("r_xp_threshold"),
+        }
+    else:
+        for k in ["r_id", "r_name", "r_slug", "r_color_hex", "r_icon_url", "r_level", "r_xp_threshold"]:
+            data.pop(k, None)
+        data["rank"] = None
+
+    xp = await conn.fetchrow(
+        "SELECT total_xp, sessions_attended, messages_sent FROM member_xp WHERE member_id = $1",
+        current_user["id"],
+    )
+    data["xp"] = dict(xp) if xp else {"total_xp": 0, "sessions_attended": 0, "messages_sent": 0}
+
+    char_count = await conn.fetchval(
+        "SELECT COUNT(*) FROM characters WHERE member_id = $1 AND active = TRUE",
+        current_user["id"],
+    )
+    data["character_count"] = char_count or 0
+
+    return item_response(data)
+
+
+@router.post("/change-password", response_model=dict)
+async def change_password(
+    body: ChangePasswordRequest,
+    current_user: dict = Depends(get_current_user),
+    conn: asyncpg.Connection = Depends(get_db),
+):
+    if len(body.new_password) < 8:
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 8 caracteres")
+
+    row = await conn.fetchrow(
+        "SELECT password_hash FROM members WHERE id = $1", current_user["id"]
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Member not found")
+    if not verify_password(body.current_password, row["password_hash"]):
+        raise HTTPException(status_code=401, detail="La contraseña actual no es correcta")
+
+    await conn.execute(
+        "UPDATE members SET password_hash = $1 WHERE id = $2",
+        hash_password(body.new_password),
+        current_user["id"],
+    )
+    await log_event(
+        conn,
+        "member.password_changed",
+        "member",
+        target_id=str(current_user["id"]),
+        actor_member_id=str(current_user["id"]),
+    )
+    return item_response({"ok": True})

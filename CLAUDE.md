@@ -130,6 +130,9 @@ DnD/
 │   │       └── modal.js           # Diálogos con animación spring
 │   └── pages/
 │       ├── login.js               # Login/registro + fondo mágico animado (sello/runas/chispas, ver assets/)
+│       ├── profile.js             # #/perfil — Mi DnD > Perfil: cabecera+datos, estadísticas (XP/sesiones/
+│       │                          #   mensajes/personajes), personaje activo + grid, editar perfil,
+│       │                          #   seguridad (cambiar contraseña) y cerrar sesión
 │       ├── dashboard.js           # 5 stats de comunidad en tiempo real
 │       ├── campaigns.js           # CRUD campañas + metadatos/progresión/reglas (C1);
 │       │                          #   modal de detalle con barra lateral de 9 pestañas (detalles/sesiones/
@@ -198,7 +201,7 @@ DnD/
 │   │   ├── treasure.py            # tesoro por nivel/tier + rarezas (C7)
 │   │   └── community_feed.py      # post_system_message → Saludos / Salón de la Fama (CM3)
 │   └── routers/
-│       ├── auth.py                # POST /login, /register
+│       ├── auth.py                # POST /login, /register, /change-password; GET /me (perfil: +rank +xp +character_count)
 │       ├── members.py             # GET/POST/PUT /members (POST admin-only)
 │       ├── me.py                  # /me/active-character — personaje activo (identidad social, CM1)
 │       ├── campaigns.py           # CRUD /campaigns + DELETE + metadatos C1 + /progression (C4) + provisión de sala (CM2)
@@ -334,7 +337,7 @@ Estructura del mega-menu (en `router.js`, constante `NAV_GROUPS`):
 
 - **Noticias** *(deshabilitado)*
 - **Dashboard** → `#/dashboard`
-- **Mi DnD:** Personajes `#/characters`, Inventario del Jugador `#/inventory` | Perfil *(deshabilitado)*
+- **Mi DnD:** Perfil `#/perfil`, Personajes `#/characters`, Inventario `#/inventory`
 - **Juego:** Campañas `#/campaigns`, Sesiones `#/sessions`, Tesoros `#/treasury`, Aventuras & Misiones `#/quests`, Encuentros `#/encounters`, Trama `#/narrative`, Compendio `#/world`
 - **Comunidad:** Chat `#/chat`, Calendario & Eventos `#/calendario`, Clanes `#/clanes`, Salón de la Fama `#/fama` (CM1–CM6)
 - **Configuración:** Miembros `#/members`, Catálogo `#/catalogue`, Catálogo de Hechizos `#/spellbook` | Event Log *(deshabilitado)*
@@ -954,7 +957,7 @@ Luego `git add -A; git commit -m "feat: C7 arcos/giros + guía de recompensas + 
 - [x] NPCs, Locations, Quests expuestos (routers worldbuilding/quests, C2/C3) + frontend (Compendio, Aventuras & Misiones)
 - [x] Salón de la Fama (CM6) · Calendario & Eventos (CM4)
 - [ ] Event Log frontend page (pendiente)
-- [ ] Perfil de usuario completo (pendiente)
+- [x] Perfil de usuario completo (`frontend/pages/profile.js` #/perfil): datos, estadísticas, personaje activo, editar perfil, cambiar contraseña
 
 ---
 
