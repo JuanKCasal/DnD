@@ -200,7 +200,7 @@ export async function render(container) {
     const card = document.createElement('div');
     card.style.cssText = `
       background:var(--stone);border:1px solid var(--border);border-radius:10px;
-      padding:0;overflow:hidden;cursor:pointer;position:relative;
+      padding:0;overflow:hidden;cursor:pointer;position:relative;height:300px;
       transition:transform var(--dur-fast) var(--ease-spring),box-shadow var(--dur-fast) var(--ease-spring);
       animation:fadeSlideIn var(--dur-slow) var(--ease-out-expo) ${index * 60}ms both;
     `;
@@ -223,12 +223,12 @@ export async function render(container) {
       if (!e.target.closest('.card-action-btn')) openDetailSheet(c.id);
     });
 
-    /* Portrait bar */
+    /* Portrait — cubre el 100% de la ficha (fondo) */
     const portrait = document.createElement('div');
     portrait.style.cssText = `
-      height:90px;background:linear-gradient(135deg,var(--stone-light),var(--border));
+      position:absolute;inset:0;background:linear-gradient(135deg,var(--stone-light),var(--border));
       display:flex;align-items:center;justify-content:center;
-      font-size:36px;position:relative;overflow:hidden;
+      font-size:64px;overflow:hidden;
     `;
     if (c.portrait_url) {
       const img = document.createElement('img');
@@ -282,9 +282,14 @@ export async function render(container) {
       portrait.appendChild(actionBar);
     }
 
-    /* Body */
+    /* Body — panel con desenfoque para legibilidad sobre la imagen */
     const body = document.createElement('div');
-    body.style.cssText = 'padding:16px;';
+    body.style.cssText = `
+      position:absolute;left:0;right:0;bottom:0;padding:14px 16px;z-index:1;
+      background:rgba(255,255,255,0.72);
+      -webkit-backdrop-filter:blur(12px) saturate(1.1);backdrop-filter:blur(12px) saturate(1.1);
+      border-top:1px solid rgba(255,255,255,0.55);
+    `;
 
     const nameEl = document.createElement('div');
     nameEl.style.cssText = 'font-family:var(--font-display);font-size:16px;color:var(--ink);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
