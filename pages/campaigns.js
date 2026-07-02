@@ -167,6 +167,9 @@ export async function render(container) {
       card.style.boxShadow = '';
     });
 
+    /* Click en la tarjeta → detalle completo de la campaña */
+    card.addEventListener('click', () => openDetail(c));
+
     /* Status badge */
     const badge = document.createElement('div');
     badge.style.cssText = `
@@ -529,4 +532,244 @@ export async function render(container) {
     document.body.appendChild(overlay);
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   }
+
+  /* ── Modal: detalle completo de la campaña (pestañas) ── */
+  function openDetail(campaign) {
+    const cid = campaign.id;
+    const isManager = user?.role === 'admin' || String(campaign.dm_id ?? '') === String(user?.id ?? '');
+    let membersCache = null;
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(9,8,10,0.8);backdrop-filter:blur(8px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeIn var(--dur-normal) var(--ease-smooth);';
+    const modal = document.createElement('div');
+    modal.style.cssText = 'background:var(--stone);border:1px solid var(--border);border-radius:14px;width:min(820px,96vw);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;animation:modalIn var(--dur-normal) var(--ease-spring);';
+
+    const head = document.createElement('div');
+    head.style.cssText = 'display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:22px 26px 14px;';
+    const cfg = STATUS_CONFIG[campaign.status] ?? STATUS_CONFIG.archived;
+    head.innerHTML = `<div>
+        <div style="font-family:var(--font-display);font-size:22px;color:var(--gold);">${escHtml(campaign.name)}</div>
+        ${campaign.subtitle ? `<div style="font-style:italic;color:var(--ink-muted);font-size:13px;margin-top:2px;">${escHtml(campaign.subtitle)}</div>` : ''}
+        <div style="margin-top:6px;"><span style="font-size:11px;font-weight:600;text-transform:uppercase;color:${cfg.color};border:1px solid ${cfg.border}44;background:${cfg.border}22;padding:2px 10px;border-radius:12px;">${cfg.label}</span></div>
+      </div>`;
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '×';
+    closeBtn.style.cssText = 'background:none;border:none;color:var(--ink-muted);font-size:24px;cursor:pointer;line-height:1;';
+    closeBtn.addEventListener('click', () => overlay.remove());
+    head.appendChild(closeBtn);
+
+    const tabs = [
+      ['details', '📋 Detalles'], ['sessions', '📜 Sesiones'], ['quests', '⚔️ Aventuras & Misiones'],
+      ['encounters', '🐉 Encuentros'], ['narrative', '🎭 Trama'], ['dm', '👑 DM'], ['characters', '🧙 Personajes'],
+    ];
+    const tabBar = document.createElement('div');
+    tabBar.style.cssText = 'display:flex;gap:4px;padding:0 26px;border-bottom:1px solid var(--border);overflow-x:auto;';
+    const content = document.createElement('div');
+    content.style.cssText = 'padding:20px 26px;overflow-y:auto;';
+    let active = 'details';
+    tabs.forEach(([id, label]) => {
+      const b = document.createElement('button');
+      b.dataset.tab = id; b.textContent = label;
+      b.style.cssText = tabBtnStyle(id === active);
+      b.addEventListener('click', () => { active = id; syncTabs(); renderTab(id); });
+      tabBar.appendChild(b);
+    });
+    function syncTabs() { tabBar.querySelectorAll('button').forEach(b => { b.style.cssText = tabBtnStyle(b.dataset.tab === active); }); }
+
+    modal.appendChild(head); modal.appendChild(tabBar); modal.appendChild(content);
+    overlay.appendChild(modal); document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+    async function getMembers() {
+      if (!membersCache) { try { membersCache = (await api.get('/members?per_page=200')).data ?? []; } catch { membersCache = []; } }
+      return membersCache;
+    }
+    const memberName = (id, list) => { const m = (list || []).find(x => String(x.id) === String(id)); return m ? (m.display_name || m.username) : '—'; };
+
+    async function renderTab(id) {
+      content.innerHTML = '<div style="color:var(--ink-muted);padding:20px;">Cargando...</div>';
+      try {
+        if (id === 'details') return await renderDetails();
+        if (id === 'sessions') return await renderSessions();
+        if (id === 'quests') return await renderQuests();
+        if (id === 'encounters') return await renderEncounters();
+        if (id === 'narrative') return await renderNarrative();
+        if (id === 'dm') return await renderDM();
+        if (id === 'characters') return await renderCharacters();
+      } catch (e) { content.innerHTML = `<div style="color:var(--crimson);padding:12px;">Error: ${escHtml(e.message)}</div>`; }
+    }
+
+    async function renderDetails() {
+      const rows = [];
+      const add = (k, v) => { if (v !== null && v !== undefined && v !== '') rows.push([k, v]); };
+      add('Sistema', campaign.system);
+      add('Edición', campaign.ruleset);
+      add('Mundo', campaign.world_name);
+      add('Ambientación', campaign.setting);
+      add('Niveles', `${campaign.start_level ?? 1} → ${campaign.current_level ?? 1}${campaign.target_end_level ? ` (meta ${campaign.target_end_level})` : ''}`);
+      add('Progresión', campaign.leveling_method === 'milestone' ? 'Hitos' : 'XP');
+      add('Frecuencia', campaign.session_frequency);
+      const chips = [...(campaign.tone || []), ...(campaign.themes || [])];
+      let html = '<div style="display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:14px;">';
+      rows.forEach(([k, v]) => { html += `<div style="color:var(--ink-muted);">${k}</div><div style="color:var(--ink);">${escHtml(String(v))}</div>`; });
+      html += '</div>';
+      if (campaign.description) html += `<p style="margin-top:16px;font-size:14px;color:var(--ink-muted);line-height:1.6;">${escHtml(campaign.description)}</p>`;
+      if (chips.length) html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;">' + chips.map(t => `<span style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--gold-dim);background:var(--gold-glow);border:1px solid var(--gold-glow);padding:2px 8px;border-radius:10px;">${escHtml(t)}</span>`).join('') + '</div>';
+      if ((campaign.variant_rules || []).length) html += `<div style="margin-top:12px;font-size:13px;color:var(--ink-muted);"><b>Reglas variantes:</b> ${campaign.variant_rules.map(escHtml).join(', ')}</div>`;
+      if ((campaign.house_rules || []).length) html += '<div style="margin-top:8px;font-size:13px;color:var(--ink-muted);"><b>Reglas caseras:</b><ul style="margin:4px 0 0;padding-left:18px;">' + campaign.house_rules.map(r => `<li>${escHtml(r.title || '')}${r.description ? ': ' + escHtml(r.description) : ''}</li>`).join('') + '</ul></div>';
+      html += '<div id="camp-prog" style="margin-top:18px;"></div>';
+      content.innerHTML = html;
+      try {
+        const p = (await api.get(`/campaigns/${cid}/progression`)).data;
+        const box = content.querySelector('#camp-prog');
+        if (p.leveling_method === 'xp') {
+          box.innerHTML = `<div style="background:var(--stone-light);border:1px solid var(--border);border-radius:10px;padding:14px 16px;">
+            <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:13px;">
+              <span style="font-family:var(--font-display);color:var(--gold);">Progresión</span>
+              <span style="font-family:var(--font-mono);">Nivel ${p.current_level}</span>
+              <span style="font-family:var(--font-mono);color:var(--gold-dim);">${(p.total_xp || 0).toLocaleString('es-CL')} XP</span>
+              <span style="font-family:var(--font-mono);color:var(--ink-muted);">BPC +${p.proficiency_bonus}</span>
+              ${p.suggested_level > p.current_level ? `<span style="color:var(--success);font-weight:600;">↑ subir a ${p.suggested_level}</span>` : ''}
+            </div>
+            <div style="height:8px;background:var(--stone);border-radius:4px;overflow:hidden;margin-top:10px;"><div style="height:100%;width:${p.pct_to_next ?? 0}%;background:var(--gold);"></div></div>
+            ${p.next_level ? `<div style="font-size:11px;color:var(--ink-faint);margin-top:4px;">${p.xp_needed_for_next} XP para nivel ${p.next_level}</div>` : ''}
+          </div>`;
+        } else {
+          box.innerHTML = `<div style="background:var(--stone-light);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:13px;"><b style="color:var(--gold);font-family:var(--font-display);">Progresión por hitos</b> · Nivel ${p.current_level} · BPC +${p.proficiency_bonus}</div>`;
+        }
+      } catch (_) { /* progresión opcional */ }
+    }
+
+    async function renderSessions() {
+      const list = (await api.get(`/sessions?campaign_id=${cid}&per_page=100`)).data ?? [];
+      if (!list.length) { content.innerHTML = emptyMsg('Sin sesiones registradas'); return; }
+      content.innerHTML = countHead('Sesiones', list.length) + list.map(s => `
+        <div style="display:flex;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">
+          <div><span style="font-family:var(--font-mono);color:var(--gold-dim);">#${s.session_number}</span> <span style="color:var(--ink);">${escHtml(s.title || 'Sesión')}</span></div>
+          <div style="font-size:12px;color:var(--ink-muted);white-space:nowrap;">${s.date ? escHtml(new Date(s.date + 'T12:00:00').toLocaleDateString('es-CL')) : ''}${s.xp_awarded ? ` · ✨${s.xp_awarded}` : ''}</div>
+        </div>`).join('');
+    }
+
+    async function renderQuests() {
+      const [advs, qs] = await Promise.all([
+        api.get(`/campaigns/${cid}/adventures`).then(r => r.data ?? []).catch(() => []),
+        api.get(`/campaigns/${cid}/quests`).then(r => r.data ?? []).catch(() => []),
+      ]);
+      let html = countHead('Aventuras', advs.length);
+      html += advs.length ? advs.map(a => `<div style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;"><span style="color:var(--ink);">${escHtml(a.title)}</span> <span style="font-size:11px;color:var(--ink-muted);">· ${escHtml(a.status)}${(a.rec_level_min || a.rec_level_max) ? ` · Niv ${a.rec_level_min ?? '?'}–${a.rec_level_max ?? '?'}` : ''}</span></div>`).join('') : emptyMsg('Sin aventuras');
+      html += countHead('Misiones', qs.length);
+      html += qs.length ? qs.map(q => `<div style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;"><span style="color:var(--ink);">${escHtml(q.title)}</span> <span style="font-size:11px;color:var(--ink-muted);">· ${escHtml(q.quest_type)} · ${escHtml(q.status)}</span></div>`).join('') : emptyMsg('Sin misiones');
+      content.innerHTML = html;
+    }
+
+    async function renderEncounters() {
+      const list = (await api.get(`/campaigns/${cid}/encounters`)).data ?? [];
+      if (!list.length) { content.innerHTML = emptyMsg('Sin encuentros'); return; }
+      const dl = { trivial: 'Trivial', easy: 'Fácil', medium: 'Media', hard: 'Difícil', deadly: 'Mortal' };
+      content.innerHTML = countHead('Encuentros', list.length) + list.map(e => {
+        const mons = (e.monsters || []).map(m => `${m.quantity}× ${escHtml(m.stat_block_name || m.name_override || '?')}`).join(', ');
+        return `<div style="padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;gap:8px;"><span style="color:var(--ink);">${escHtml(e.name)}</span><span style="font-size:11px;text-transform:uppercase;color:var(--gold-dim);">${dl[e.difficulty] || e.difficulty || ''}</span></div>
+          ${mons ? `<div style="font-size:12px;color:var(--ink-muted);margin-top:4px;">${mons}</div>` : ''}</div>`;
+      }).join('');
+    }
+
+    async function renderNarrative() {
+      const [arcs, twists] = await Promise.all([
+        api.get(`/campaigns/${cid}/arcs`).then(r => r.data ?? []).catch(() => []),
+        api.get(`/campaigns/${cid}/plot-twists`).then(r => r.data ?? []).catch(() => []),
+      ]);
+      let html = countHead('Arcos', arcs.length);
+      html += arcs.length ? arcs.map(a => { const b = Array.isArray(a.beats) ? a.beats : []; const d = b.filter(x => x.completed).length; return `<div style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;"><span style="color:var(--ink);">${escHtml(a.title)}</span> <span style="font-size:11px;color:var(--ink-muted);">· ${escHtml(a.status)}${b.length ? ` · ${d}/${b.length} beats` : ''}</span></div>`; }).join('') : emptyMsg('Sin arcos');
+      html += countHead('Giros', twists.length);
+      html += twists.length ? twists.map(t => `<div style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;"><span style="color:var(--ink);">${escHtml(t.title)}</span> <span style="font-size:11px;color:${t.revealed ? 'var(--success)' : 'var(--crimson)'};">· ${t.revealed ? 'revelado' : 'oculto'}</span></div>`).join('') : emptyMsg('Sin giros');
+      content.innerHTML = html;
+    }
+
+    async function renderDM() {
+      const list = await getMembers();
+      let html = `<div style="font-size:14px;color:var(--ink);margin-bottom:14px;">DM actual: <b style="color:var(--gold);">${escHtml(memberName(campaign.dm_id, list))}</b></div>`;
+      if (isManager) {
+        const opts = list.map(m => `<option value="${m.id}" ${String(m.id) === String(campaign.dm_id) ? 'selected' : ''}>${escHtml(m.display_name || m.username)} (${escHtml(m.role)})</option>`).join('');
+        html += `<label style="${LABEL_CSS}">Reasignar DM</label>
+          <select id="dm-select" class="input" style="max-width:340px;">${opts}</select>
+          <div style="margin-top:12px;"><button id="dm-save" class="btn btn-primary">Guardar DM</button></div>`;
+      } else {
+        html += '<div style="font-size:12px;color:var(--ink-faint);">Solo el DM actual o un admin puede reasignar.</div>';
+      }
+      content.innerHTML = html;
+      const saveBtn = content.querySelector('#dm-save');
+      if (saveBtn) saveBtn.addEventListener('click', async () => {
+        const val = content.querySelector('#dm-select').value;
+        saveBtn.disabled = true; saveBtn.textContent = 'Guardando...';
+        try {
+          await api.put(`/campaigns/${cid}`, { dm_id: val });
+          campaign.dm_id = val;
+          toast.success('DM actualizado');
+          loadCampaigns();
+          renderDM();
+        } catch (e) { toast.error('Error', e.message); saveBtn.disabled = false; saveBtn.textContent = 'Guardar DM'; }
+      });
+    }
+
+    async function renderCharacters() {
+      const inCampaign = (await api.get(`/characters?campaign_id=${cid}&per_page=100`)).data ?? [];
+      const list = await getMembers();
+      let html = countHead('Personajes en la campaña', inCampaign.length);
+      html += inCampaign.length ? inCampaign.map(c => `<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;">
+          <span style="color:var(--ink);">${escHtml(c.name)}</span>
+          <span style="font-size:12px;color:var(--ink-muted);">${escHtml(c.char_class || '')}${c.level ? ` · Niv ${c.level}` : ''} · ${escHtml(memberName(c.member_id, list))}</span></div>`).join('') : emptyMsg('Sin personajes');
+      if (isManager) html += '<div style="margin-top:12px;"><button id="add-char" class="btn">+ Añadir personaje</button></div>';
+      content.innerHTML = html;
+      const addBtn = content.querySelector('#add-char');
+      if (addBtn) addBtn.addEventListener('click', openAddCharacter);
+    }
+
+    async function openAddCharacter() {
+      let all = [];
+      try { all = (await api.get('/characters?per_page=200')).data ?? []; } catch (_) { /* */ }
+      const candidates = all.filter(c => String(c.campaign_id) !== String(cid));
+      if (!candidates.length) { toast.error('Sin personajes disponibles', 'Todos ya están en esta campaña'); return; }
+
+      const ov = document.createElement('div');
+      ov.style.cssText = 'position:fixed;inset:0;background:rgba(9,8,10,0.7);z-index:1100;display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeIn var(--dur-fast) var(--ease-smooth);';
+      const m = document.createElement('div');
+      m.style.cssText = 'background:var(--stone);border:1px solid var(--border);border-radius:12px;padding:24px;width:min(420px,96vw);';
+      const opts = candidates.map(c => `<option value="${c.id}">${escHtml(c.name)}${c.char_class ? ' · ' + escHtml(c.char_class) : ''}</option>`).join('');
+      m.innerHTML = `<h3 style="font-family:var(--font-display);color:var(--gold);margin:0 0 16px;font-size:18px;">Añadir personaje a la campaña</h3>
+        <label style="${LABEL_CSS}">Personaje</label>
+        <select id="pick-char" class="input">${opts}</select>
+        <div style="display:flex;gap:10px;margin-top:18px;">
+          <button id="pk-cancel" class="btn" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--ink-muted);">Cancelar</button>
+          <button id="pk-ok" class="btn btn-primary" style="flex:2;">Añadir</button>
+        </div>`;
+      ov.appendChild(m); document.body.appendChild(ov);
+      ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+      m.querySelector('#pk-cancel').addEventListener('click', () => ov.remove());
+      m.querySelector('#pk-ok').addEventListener('click', async () => {
+        const charId = m.querySelector('#pick-char').value;
+        const char = candidates.find(c => String(c.id) === String(charId));
+        const okBtn = m.querySelector('#pk-ok'); okBtn.disabled = true; okBtn.textContent = 'Añadiendo...';
+        try {
+          await api.put(`/characters/${charId}`, { campaign_id: cid });
+          if (char?.member_id) { try { await api.post(`/campaigns/${cid}/members`, { member_id: char.member_id }); } catch (_) { /* ya es miembro */ } }
+          toast.success('Personaje añadido');
+          ov.remove();
+          loadCampaigns();
+          renderCharacters();
+        } catch (e) { toast.error('Error', e.message); okBtn.disabled = false; okBtn.textContent = 'Añadir'; }
+      });
+    }
+
+    renderTab('details');
+  }
 }
+
+/* ── Helpers de módulo (detalle de campaña) ── */
+const LABEL_CSS = 'display:block;font-size:11px;font-weight:600;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 6px;';
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML; }
+function tabBtnStyle(active) {
+  return `padding:10px 12px;font-family:var(--font-ui);font-size:13px;white-space:nowrap;cursor:pointer;background:none;border:none;border-bottom:2px solid ${active ? 'var(--gold)' : 'transparent'};color:${active ? 'var(--gold)' : 'var(--ink-muted)'};font-weight:${active ? '600' : '400'};`;
+}
+function countHead(t, n) { return `<div style="font-family:var(--font-display);font-size:15px;color:var(--ink);margin:14px 0 8px;">${t} <span style="color:var(--ink-faint);font-family:var(--font-mono);font-size:13px;">(${n})</span></div>`; }
+function emptyMsg(t) { return `<div style="color:var(--ink-muted);font-size:13px;padding:8px 0;">${t}.</div>`; }
