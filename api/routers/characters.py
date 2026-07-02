@@ -375,7 +375,7 @@ async def get_character_spellcasting(
         SELECT c.class AS char_class, c.subclass, c.level, c.prof_bonus,
                c.str AS str_score, c.dex AS dex_score, c.con AS con_score,
                c.int AS int_score, c.wis AS wis_score, c.cha AS cha_score,
-               c.spell_slots, c.pact_magic
+               c.spell_slots, c.pact_magic, c.concentrating_on
         FROM characters c WHERE c.id = $1 AND c.active = TRUE
         """,
         char_id,
@@ -385,23 +385,37 @@ async def get_character_spellcasting(
 
     result = compute_spellcasting(dict(char))
 
-    # Fusionar los totales calculados con el "used" almacenado en el personaje
-    if result.get("is_caster") and result.get("caster_type") != "pact":
-        stored = char["spell_slots"]
-        if isinstance(stored, str):
-            try:
-                stored = json.loads(stored)
-            except (ValueError, TypeError):
-                stored = {}
-        stored = stored or {}
-        merged = {}
-        for lvl, total in result.get("spell_slots", {}).items():
-            used = 0
-            entry = stored.get(lvl) or stored.get(str(lvl))
-            if isinstance(entry, dict):
-                used = int(entry.get("used") or 0)
-            merged[lvl] = {"total": total, "used": min(used, total)}
-        result["spell_slots"] = merged
+    if result.get("is_caster"):
+        # Concentración activa (Fase H6)
+        result["concentrating_on"] = str(char["concentrating_on"]) if char["concentrating_on"] else None
+
+        if result.get("caster_type") == "pact":
+            # Fusionar el "used" de pacto
+            pact_stored = char["pact_magic"]
+            if isinstance(pact_stored, str):
+                try:
+                    pact_stored = json.loads(pact_stored)
+                except (ValueError, TypeError):
+                    pact_stored = {}
+            if result.get("pact_magic"):
+                result["pact_magic"]["used"] = int((pact_stored or {}).get("used") or 0)
+        else:
+            # Fusionar los totales calculados con el "used" almacenado
+            stored = char["spell_slots"]
+            if isinstance(stored, str):
+                try:
+                    stored = json.loads(stored)
+                except (ValueError, TypeError):
+                    stored = {}
+            stored = stored or {}
+            merged = {}
+            for lvl, total in result.get("spell_slots", {}).items():
+                used = 0
+                entry = stored.get(lvl) or stored.get(str(lvl))
+                if isinstance(entry, dict):
+                    used = int(entry.get("used") or 0)
+                merged[lvl] = {"total": total, "used": min(used, total)}
+            result["spell_slots"] = merged
 
     return item_response(result)
 

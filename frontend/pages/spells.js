@@ -411,6 +411,59 @@ export async function render(container) {
     compWrap.appendChild(compRow);
 
     const fMaterial = textInput('Descripción del material (si M)', sp?.material_description || '');
+    const fMatCost = textInput('Coste del componente (po)', sp?.material_cost_gp ?? '');
+
+    /* Componente consumible enlazado a un ítem del catálogo */
+    let selectedMatId = sp?.material_item_id || null;
+    const matWrap = fieldWrap('Componente consumible (ítem del inventario)');
+    const cMatConsumed = checkbox('Se consume al lanzar', sp?.material_consumed);
+    matWrap.appendChild(cMatConsumed.wrap);
+    const matSearch = document.createElement('input');
+    matSearch.type = 'text';
+    applyInputStyle(matSearch);
+    matSearch.style.marginTop = '6px';
+    matSearch.placeholder = 'Buscar ítem para enlazar…';
+    const matResults = document.createElement('div');
+    matResults.style.cssText = 'max-height:120px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;margin-top:4px;display:none;';
+    const matStatus = document.createElement('div');
+    matStatus.style.cssText = 'font-size:11px;color:var(--ink-muted);margin-top:4px;';
+    matStatus.textContent = selectedMatId ? '✔ Ítem enlazado' : 'Sin ítem enlazado';
+    matWrap.append(matSearch, matResults, matStatus);
+    let matTimer;
+    matSearch.addEventListener('input', () => {
+      clearTimeout(matTimer);
+      matTimer = setTimeout(async () => {
+        const q = matSearch.value.trim();
+        if (!q) { matResults.style.display = 'none'; return; }
+        try {
+          const res = await api.get(`/items?search=${encodeURIComponent(q)}&per_page=15`);
+          const items = res.data || [];
+          matResults.innerHTML = '';
+          matResults.style.display = 'block';
+          if (!items.length) { matResults.innerHTML = '<div style="padding:6px 10px;font-size:11px;color:var(--ink-muted);">Sin resultados</div>'; return; }
+          items.forEach((it) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.style.cssText = 'display:block;width:100%;text-align:left;padding:6px 10px;background:transparent;border:none;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px;color:var(--ink);';
+            b.textContent = it.name;
+            b.addEventListener('click', () => {
+              selectedMatId = it.id;
+              matStatus.textContent = '✔ ' + it.name;
+              matResults.style.display = 'none';
+              matSearch.value = '';
+            });
+            matResults.appendChild(b);
+          });
+        } catch (e) { matResults.style.display = 'none'; }
+      }, 300);
+    });
+    const matClear = document.createElement('button');
+    matClear.type = 'button';
+    matClear.className = 'btn';
+    matClear.style.cssText = 'font-size:10px;padding:2px 8px;margin-top:6px;';
+    matClear.textContent = 'Quitar enlace';
+    matClear.addEventListener('click', () => { selectedMatId = null; matStatus.textContent = 'Sin ítem enlazado'; });
+    matWrap.appendChild(matClear);
 
     /* Flags */
     const flagWrap = fieldWrap('Propiedades');
@@ -445,7 +498,7 @@ export async function render(container) {
     form.append(
       fName.wrap, fNameEn.wrap, row2(fLevel.wrap, fSchool.wrap),
       fCasting.wrap, row2(fRange.wrap, fDuration.wrap),
-      compWrap, fMaterial.wrap, flagWrap,
+      compWrap, fMaterial.wrap, fMatCost.wrap, matWrap, flagWrap,
       row2(fSave.wrap, fDmgType.wrap), row2(fDmgDice.wrap, fScaling.wrap),
       classWrap, fDesc.wrap, fHigher.wrap,
     );
@@ -473,6 +526,9 @@ export async function render(container) {
         comp_somatic: cS.input.checked,
         comp_material: cM.input.checked,
         material_description: fMaterial.input.value.trim() || null,
+        material_cost_gp: fMatCost.input.value ? parseFloat(fMatCost.input.value) : null,
+        material_consumed: cMatConsumed.input.checked,
+        material_item_id: selectedMatId || null,
         concentration: cConc.input.checked,
         ritual: cRit.input.checked,
         requires_attack_roll: cAtk.input.checked,

@@ -1,3 +1,4 @@
+import json
 import uuid
 
 import asyncpg
@@ -7,10 +8,12 @@ from api.dependencies import get_current_user, get_db
 from api.db.helpers import item_response, list_response, log_event, paginate, records_to_list
 from api.models.spell_model import (
     SpellCreate, SpellUpdate, CharacterSpellAdd, CharacterSpellUpdate,
+    SpellCastRequest, RestRequest, ConcentrationSet,
 )
 from api.services.spellcasting import (
     class_key, can_learn, ability_mod, max_cantrips, max_spells_known,
-    max_spells_prepared, PREPARATION_MODEL, SPELLCASTING_ABILITY, CASTER_TYPE,
+    max_spells_prepared, spell_slots_for, pact_slots_for, max_spell_level,
+    PREPARATION_MODEL, SPELLCASTING_ABILITY, CASTER_TYPE,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["spells"])
@@ -31,7 +34,7 @@ SPELL_FULL_COLUMNS = """
     id, name, name_en, level, school,
     casting_time, casting_time_type, range_text, range_type, range_feet,
     comp_verbal, comp_somatic, comp_material, material_description,
-    material_cost_gp, material_consumed,
+    material_cost_gp, material_consumed, material_item_id,
     duration, concentration, ritual,
     description, higher_levels,
     requires_attack_roll, saving_throw, damage_dice, damage_type, damage_scaling,
@@ -436,3 +439,254 @@ async def remove_character_spell(
     )
     if result == "DELETE 0":
         raise HTTPException(status_code=404, detail="Spell not in repertoire")
+
+
+# ═══════════════════════════════════════════════════════
+#  LANZAMIENTO / DESCANSOS / CONCENTRACIÓN — Fase H6
+# ═══════════════════════════════════════════════════════
+_RITUAL_CLASSES = {"bard", "cleric", "druid", "wizard"}
+
+
+async def _cast_char(conn, char_id):
+    return await conn.fetchrow(
+        """
+        SELECT c.id, c.member_id, c.class AS char_class, c.subclass, c.level,
+               c.spell_slots, c.pact_magic, c.concentrating_on
+        FROM characters c WHERE c.id = $1 AND c.active = TRUE
+        """,
+        char_id,
+    )
+
+
+def _parse_jsonb(val):
+    if isinstance(val, str):
+        try:
+            return json.loads(val)
+        except (ValueError, TypeError):
+            return {}
+    return val or {}
+
+
+def _used_map(spell_slots) -> dict:
+    """{'1': used, ...} a partir del JSONB almacenado."""
+    stored = _parse_jsonb(spell_slots)
+    out = {}
+    for lvl, entry in (stored or {}).items():
+        if isinstance(entry, dict):
+            out[str(lvl)] = int(entry.get("used") or 0)
+    return out
+
+
+def _slots_jsonb(used_map: dict) -> str:
+    return json.dumps({lvl: {"used": u} for lvl, u in used_map.items()})
+
+
+@router.post("/characters/{char_id}/cast", response_model=dict)
+async def cast_spell(
+    char_id: uuid.UUID,
+    body: SpellCastRequest,
+    conn: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    char = await _cast_char(conn, char_id)
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found")
+    if not _can_edit(current_user, char["member_id"]):
+        raise HTTPException(status_code=403, detail="Cannot act for another player's character")
+
+    spell = await conn.fetchrow(
+        """
+        SELECT id, name, level, concentration, ritual, higher_levels,
+               material_consumed, material_cost_gp, material_item_id
+        FROM spells WHERE id = $1
+        """,
+        body.spell_id,
+    )
+    if not spell:
+        raise HTTPException(status_code=404, detail="Spell not found")
+
+    key = class_key(char["char_class"], char["subclass"])
+    level = char["level"] or 1
+    if not key or CASTER_TYPE.get(key) is None:
+        raise HTTPException(status_code=400, detail={"code": "NOT_A_CASTER", "message": "Esta clase no lanza hechizos"})
+    caster = CASTER_TYPE[key]
+
+    warnings = []
+    cast_level = spell["level"]
+    scaling_note = None
+    used_map = _used_map(char["spell_slots"])
+    pact = _parse_jsonb(char["pact_magic"])
+    pact_used = int(pact.get("used") or 0)
+
+    # ── Determinar gasto de ranura ──
+    if body.as_ritual:
+        if not spell["ritual"] or key not in _RITUAL_CLASSES:
+            raise HTTPException(status_code=400, detail={
+                "code": "RITUAL_NOT_ALLOWED",
+                "message": "Este hechizo o tu clase no permite lanzamiento ritual"})
+        warnings.append("Lanzado como ritual (+10 min, sin gastar ranura).")
+    elif spell["level"] == 0:
+        pass  # los trucos no gastan ranura
+    elif caster == "pact":
+        pinfo = pact_slots_for(level)
+        if not pinfo:
+            raise HTTPException(status_code=400, detail={"code": "NO_SLOTS", "message": "No tienes ranuras de pacto"})
+        if spell["level"] > pinfo["slot_level"]:
+            raise HTTPException(status_code=400, detail={"code": "LEVEL_TOO_HIGH", "message": "Nivel de hechizo superior a tu ranura de pacto"})
+        if pact_used >= pinfo["slots"]:
+            raise HTTPException(status_code=400, detail={"code": "NO_SLOTS", "message": "Sin ranuras de pacto disponibles"})
+        pact_used += 1
+        cast_level = pinfo["slot_level"]
+        if cast_level > spell["level"]:
+            scaling_note = spell["higher_levels"]
+    else:
+        base = spell["level"]
+        chosen = body.slot_level or base
+        if chosen < base:
+            raise HTTPException(status_code=400, detail={"code": "SLOT_TOO_LOW", "message": "La ranura es de nivel inferior al hechizo"})
+        totals = spell_slots_for(key, level)  # {'1': total, ...}
+        total = int(totals.get(str(chosen)) or 0)
+        used = used_map.get(str(chosen), 0)
+        if used >= total:
+            raise HTTPException(status_code=400, detail={"code": "NO_SLOTS", "message": f"Sin ranuras de nivel {chosen} disponibles"})
+        used_map[str(chosen)] = used + 1
+        cast_level = chosen
+        if chosen > base:
+            scaling_note = spell["higher_levels"] or "Lanzado a nivel superior."
+
+    # ── Componente material con coste ──
+    consumed_name = None
+    if spell["material_consumed"]:
+        if spell["material_item_id"]:
+            comp = await conn.fetchrow("SELECT name FROM items WHERE id = $1", spell["material_item_id"])
+            comp_name = comp["name"] if comp else "componente"
+            inv = await conn.fetchrow(
+                "SELECT quantity FROM character_inventory WHERE character_id = $1 AND item_id = $2",
+                char_id, spell["material_item_id"],
+            )
+            if not inv or inv["quantity"] < 1:
+                raise HTTPException(status_code=400, detail={
+                    "code": "MISSING_COMPONENT",
+                    "message": f"Necesitas «{comp_name}» en tu inventario para lanzar este conjuro"})
+            consumed_name = comp_name
+        elif spell["material_cost_gp"]:
+            warnings.append(
+                f"Consume un componente material de {spell['material_cost_gp']:.0f} po "
+                "(enlaza el ítem al hechizo para controlarlo).")
+
+    # ── Concentración ──
+    new_concentration = char["concentrating_on"]
+    replaced = None
+    if spell["concentration"]:
+        if char["concentrating_on"] and str(char["concentrating_on"]) != str(spell["id"]):
+            prev = await conn.fetchrow("SELECT name FROM spells WHERE id = $1", char["concentrating_on"])
+            replaced = prev["name"] if prev else None
+        new_concentration = spell["id"]
+
+    # ── Persistir (transacción) ──
+    async with conn.transaction():
+        if consumed_name:
+            row = await conn.fetchrow(
+                "SELECT quantity FROM character_inventory WHERE character_id = $1 AND item_id = $2 FOR UPDATE",
+                char_id, spell["material_item_id"],
+            )
+            if not row or row["quantity"] < 1:
+                raise HTTPException(status_code=400, detail={
+                    "code": "MISSING_COMPONENT", "message": "Ya no tienes el componente requerido"})
+            if row["quantity"] <= 1:
+                await conn.execute(
+                    "DELETE FROM character_inventory WHERE character_id = $1 AND item_id = $2",
+                    char_id, spell["material_item_id"])
+            else:
+                await conn.execute(
+                    "UPDATE character_inventory SET quantity = quantity - 1 WHERE character_id = $1 AND item_id = $2",
+                    char_id, spell["material_item_id"])
+        await conn.execute(
+            "UPDATE characters SET spell_slots = $1::jsonb, pact_magic = $2::jsonb, concentrating_on = $3 WHERE id = $4",
+            _slots_jsonb(used_map),
+            json.dumps({"used": pact_used}) if caster == "pact" else (json.dumps(pact) if pact else None),
+            new_concentration, char_id,
+        )
+    await log_event(conn, "spell_cast", "character", str(char_id), spell["name"],
+                    actor_member_id=str(current_user["id"]), metadata={"level": cast_level})
+
+    return item_response({
+        "spell": spell["name"], "cast_level": cast_level, "as_ritual": body.as_ritual,
+        "scaling_note": scaling_note, "consumed_component": consumed_name,
+        "concentration": bool(spell["concentration"]),
+        "replaced_concentration": replaced, "warnings": warnings,
+    })
+
+
+@router.post("/characters/{char_id}/rest", response_model=dict)
+async def rest(
+    char_id: uuid.UUID,
+    body: RestRequest,
+    conn: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    char = await _cast_char(conn, char_id)
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found")
+    if not _can_edit(current_user, char["member_id"]):
+        raise HTTPException(status_code=403, detail="Cannot act for another player's character")
+
+    pact = _parse_jsonb(char["pact_magic"])
+    if body.type == "short":
+        # Pact Magic se recupera en descanso corto
+        pact["used"] = 0
+        await conn.execute(
+            "UPDATE characters SET pact_magic = $1::jsonb WHERE id = $2",
+            json.dumps(pact), char_id)
+        msg = "Descanso corto: ranuras de pacto recuperadas."
+    else:
+        # Descanso largo: todas las ranuras y la concentración
+        pact["used"] = 0
+        await conn.execute(
+            "UPDATE characters SET spell_slots = '{}'::jsonb, pact_magic = $1::jsonb, concentrating_on = NULL WHERE id = $2",
+            json.dumps(pact), char_id)
+        msg = "Descanso largo: todas las ranuras recuperadas."
+    return item_response({"rest": body.type, "message": msg})
+
+
+@router.put("/characters/{char_id}/concentration", response_model=dict)
+async def set_concentration(
+    char_id: uuid.UUID,
+    body: ConcentrationSet,
+    conn: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    char = await _cast_char(conn, char_id)
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found")
+    if not _can_edit(current_user, char["member_id"]):
+        raise HTTPException(status_code=403, detail="Cannot act for another player's character")
+    await conn.execute(
+        "UPDATE characters SET concentrating_on = $1 WHERE id = $2", body.spell_id, char_id)
+    return item_response({"concentrating_on": str(body.spell_id) if body.spell_id else None})
+
+
+@router.post("/characters/{char_id}/spell-slots/restore", response_model=dict)
+async def restore_slot(
+    char_id: uuid.UUID,
+    level: int = Query(..., ge=1, le=9),
+    is_pact: bool = Query(False),
+    conn: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Recupera manualmente una ranura (−1 al 'used')."""
+    char = await _cast_char(conn, char_id)
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found")
+    if not _can_edit(current_user, char["member_id"]):
+        raise HTTPException(status_code=403, detail="Cannot act for another player's character")
+
+    if is_pact:
+        pact = _parse_jsonb(char["pact_magic"])
+        pact["used"] = max(0, int(pact.get("used") or 0) - 1)
+        await conn.execute("UPDATE characters SET pact_magic = $1::jsonb WHERE id = $2", json.dumps(pact), char_id)
+    else:
+        used_map = _used_map(char["spell_slots"])
+        used_map[str(level)] = max(0, used_map.get(str(level), 0) - 1)
+        await conn.execute("UPDATE characters SET spell_slots = $1::jsonb WHERE id = $2", _slots_jsonb(used_map), char_id)
+    return item_response({"restored_level": level, "is_pact": is_pact})

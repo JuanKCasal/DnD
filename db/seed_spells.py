@@ -59,6 +59,7 @@ COLUMNS = [
     "name", "name_en", "level", "school",
     "casting_time", "casting_time_type", "range_text", "range_type", "range_feet",
     "comp_verbal", "comp_somatic", "comp_material", "material_description",
+    "material_cost_gp", "material_consumed",
     "duration", "concentration", "ritual",
     "description", "higher_levels",
     "requires_attack_roll", "saving_throw", "damage_dice", "damage_type",
@@ -465,6 +466,17 @@ def _base_damage(raw: dict):
     return dice, dtype
 
 
+def _material_cost(text: str):
+    """Extrae (coste_po, consumido) de la descripción del material SRD."""
+    if not text:
+        return None, False
+    low = text.lower()
+    m = re.search(r"worth\s+at\s+least\s+([\d,]+)\s*gp", low) or re.search(r"([\d,]+)\s*gp", low)
+    cost = float(m.group(1).replace(",", "")) if m else None
+    consumed = "consume" in low  # "which the spell consumes"
+    return cost, consumed
+
+
 def transform_spell(raw: dict) -> dict:
     index = raw["index"]
     comps = set(raw.get("components") or [])
@@ -500,6 +512,8 @@ def transform_spell(raw: dict) -> dict:
         "comp_somatic": "S" in comps,
         "comp_material": "M" in comps,
         "material_description": raw.get("material"),
+        "material_cost_gp": _material_cost(raw.get("material"))[0],
+        "material_consumed": _material_cost(raw.get("material"))[1],
         "duration": raw.get("duration", "Instantáneo"),
         "concentration": bool(raw.get("concentration", False)),
         "ritual": bool(raw.get("ritual", False)),

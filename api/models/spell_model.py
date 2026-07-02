@@ -40,6 +40,7 @@ class _SpellBase(BaseModel):
     material_description: Optional[str] = None
     material_cost_gp: Optional[float] = None
     material_consumed: Optional[bool] = None
+    material_item_id: Optional[UUID] = None
 
     duration: Optional[str] = None
     concentration: Optional[bool] = None
@@ -155,3 +156,32 @@ class CharacterSpellUpdate(BaseModel):
         if v is not None and v not in SPELL_SOURCES:
             raise ValueError("source invalido: " + str(v))
         return v
+
+
+# ── Acciones de conjuración (Fase H6) ─────────────────────────────────
+class SpellCastRequest(BaseModel):
+    spell_id: UUID
+    slot_level: Optional[int] = None   # nivel de ranura a gastar (upcasting); por defecto el del hechizo
+    as_ritual: bool = False            # lanzar como ritual (no gasta ranura)
+
+    @field_validator("slot_level")
+    @classmethod
+    def _check_slot(cls, v):
+        if v is not None and not (1 <= v <= 9):
+            raise ValueError("slot_level debe estar entre 1 y 9")
+        return v
+
+
+class RestRequest(BaseModel):
+    type: str  # 'short' | 'long'
+
+    @field_validator("type")
+    @classmethod
+    def _check_type(cls, v):
+        if v not in ("short", "long"):
+            raise ValueError("type debe ser 'short' o 'long'")
+        return v
+
+
+class ConcentrationSet(BaseModel):
+    spell_id: Optional[UUID] = None  # None = terminar concentración

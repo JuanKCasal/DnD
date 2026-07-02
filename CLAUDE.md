@@ -655,7 +655,24 @@ git push origin main
 
 **Nota:** `characters.spell_slots` sigue guardando el estado `used`; el endpoint `/spellcasting` fusiona totales calculados con ese `used`. La columna `characters.spells_known` (JSONB) queda deprecada (se elimina en H6).
 
-### Fase H6 — Refinamientos mecánicos + limpieza (pendiente)
+### Fase H6 — Refinamientos mecánicos ✅ COMPLETADA (parcial; limpieza pendiente)
+Alcance elegido: ranuras+descansos, concentración, rituales+upcasting asistido y **coste de componentes**. (La eliminación de columnas deprecadas `spells_known`/`cantrips_known` queda pendiente.)
+- [x] Migración `005_spellcasting_state.sql`: `characters.concentrating_on UUID` (→spells) y `spells.material_item_id UUID` (→items, ítem consumible enlazado).
+- [x] **Backend** (`spells.py`): `POST /characters/{id}/cast` (gasta ranura o pacto, **upcasting** con `slot_level`, **ritual** sin ranura, fija **concentración** reemplazando la previa, **consume el componente** enlazado y bloquea si falta), `POST /characters/{id}/rest` (corto=pacto, largo=todo+concentración), `PUT /characters/{id}/concentration`, `POST /characters/{id}/spell-slots/restore`. Modelos `SpellCastRequest/RestRequest/ConcentrationSet`.
+- [x] `/spellcasting` ahora incluye `concentrating_on` y el `used` de pacto.
+- [x] **Seeder**: `transform_spell` parsea `material_cost_gp` y `material_consumed` desde el texto del material SRD (regex "worth [at least] X gp" + "consumes"). `COLUMNS` actualizado. **Requiere re-ejecutar el seed** para poblar esos campos.
+- [x] **Frontend ficha** (`characters.js`): banner de concentración con "Terminar", botones de descanso corto/largo, restaurar ranura (↺), y botón **✦ Lanzar** por hechizo con selector de nivel (upcasting), opción ritual, y avisos de escalado/componente/concentración.
+- [x] **Frontend catálogo** (`spells.js`): el editor admin permite fijar coste, marcar "se consume" y **enlazar el ítem consumible** (buscador del catálogo) para activar el bloqueo/consumo.
+- [x] Verificado: `node --check` (characters.js, spells.js); parse de `spells.py`/`characters.py`/`seed_spells.py`; lógica de `_material_cost` (5 casos); `sqlglot` en `005`.
+
+**Nota de componentes:** el bloqueo/consumo se activa **por hechizo** al enlazar su ítem consumible en el editor (admin). Sin enlace, un hechizo con componente costoso solo muestra un aviso no bloqueante.
+
+**⚠️ PENDIENTE DE DESPLIEGUE (H6) — desde PowerShell:**
+```
+C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 005_spellcasting_state
+C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/seed_spells.py
+```
+Luego `git add -A; git commit -m "feat: H6 lanzamiento/descansos/concentración/upcasting + coste de componentes"; git push origin main`.
 
 ---
 

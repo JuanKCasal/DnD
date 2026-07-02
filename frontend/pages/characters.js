@@ -1283,6 +1283,32 @@ export async function render(container) {
           return;
         }
 
+        /* Banner de concentración activa */
+        if (sc.concentrating_on) {
+          const conc = repertoire.find((s) => s.spell_id === sc.concentrating_on);
+          const banner = document.createElement('div');
+          banner.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(245,158,11,0.12);border:1px solid #f59e0b55;border-radius:10px;padding:10px 14px;margin-bottom:16px;';
+          const txt = document.createElement('div');
+          txt.style.cssText = 'font-size:12px;color:var(--ink);';
+          txt.innerHTML = `🌀 <strong>Concentrado en ${conc ? conc.name : 'un hechizo'}</strong>`;
+          banner.appendChild(txt);
+          if (canEdit) {
+            const endBtn = document.createElement('button');
+            endBtn.className = 'btn';
+            endBtn.style.cssText = 'font-size:11px;padding:4px 10px;background:transparent;border:1px solid #f59e0b;color:#b45309;';
+            endBtn.textContent = 'Terminar';
+            endBtn.addEventListener('click', async () => {
+              try {
+                await api.put(`/characters/${c.id}/concentration`, { spell_id: null });
+                toast.success('Concentración terminada');
+                render();
+              } catch (err) { toast.error(err.message); }
+            });
+            banner.appendChild(endBtn);
+          }
+          el.appendChild(banner);
+        }
+
         /* Parámetros de conjuración */
         const stats = document.createElement('div');
         stats.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:20px;';
@@ -1313,19 +1339,67 @@ export async function render(container) {
         }
         el.appendChild(counters);
 
-        /* Espacios de conjuro */
-        el.appendChild(sectionTitle('Espacios de Conjuro'));
+        /* Espacios de conjuro + descansos */
+        const slotsHead = document.createElement('div');
+        slotsHead.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;';
+        const slotsTitle = sectionTitle('Espacios de Conjuro');
+        slotsTitle.style.margin = '0';
+        slotsHead.appendChild(slotsTitle);
+        if (canEdit) {
+          const restWrap = document.createElement('div');
+          restWrap.style.cssText = 'display:flex;gap:6px;';
+          const doRest = async (type) => {
+            try {
+              const r = await api.post(`/characters/${c.id}/rest`, { type });
+              toast.success(r.data?.message || 'Descanso completado');
+              render();
+            } catch (err) { toast.error(err.message); }
+          };
+          const shortBtn = document.createElement('button');
+          shortBtn.className = 'btn';
+          shortBtn.style.cssText = 'font-size:11px;padding:5px 10px;';
+          shortBtn.textContent = '🌙 Corto';
+          shortBtn.title = 'Descanso corto (recupera Pact Magic)';
+          shortBtn.addEventListener('click', () => doRest('short'));
+          const longBtn = document.createElement('button');
+          longBtn.className = 'btn btn-primary';
+          longBtn.style.cssText = 'font-size:11px;padding:5px 10px;';
+          longBtn.textContent = '🛏️ Largo';
+          longBtn.title = 'Descanso largo (recupera todo)';
+          longBtn.addEventListener('click', () => doRest('long'));
+          restWrap.appendChild(shortBtn);
+          restWrap.appendChild(longBtn);
+          slotsHead.appendChild(restWrap);
+        }
+        el.appendChild(slotsHead);
+
+        const restoreSlot = async (level, isPact) => {
+          try {
+            await api.post(`/characters/${c.id}/spell-slots/restore?level=${level}&is_pact=${isPact}`);
+            render();
+          } catch (err) { toast.error(err.message); }
+        };
+
         if (sc.caster_type === 'pact' && sc.pact_magic) {
+          const total = sc.pact_magic.slots;
+          const avail = Math.max(0, total - (sc.pact_magic.used || 0));
           const p = document.createElement('div');
           p.style.cssText = 'background:var(--stone-light);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;margin-bottom:20px;';
           p.innerHTML = `<div style="font-size:9px;font-weight:700;color:var(--gold-dim);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Pacto (nivel ${sc.pact_magic.slot_level})</div>
-            <div style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:var(--gold);">${sc.pact_magic.slots} ranuras</div>
+            <div style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:var(--gold);">${avail} / ${total} ranuras</div>
             <div style="font-size:10px;color:var(--ink-muted);margin-top:4px;">Se recuperan en descanso corto</div>`;
+          if (canEdit && (sc.pact_magic.used || 0) > 0) {
+            const rb = document.createElement('button');
+            rb.className = 'btn';
+            rb.style.cssText = 'font-size:10px;padding:3px 8px;margin-top:8px;';
+            rb.textContent = '↺ Recuperar 1';
+            rb.addEventListener('click', () => restoreSlot(sc.pact_magic.slot_level, true));
+            p.appendChild(rb);
+          }
           el.appendChild(p);
         } else {
           const slots = sc.spell_slots || {};
-          const keys = Object.keys(slots);
-          if (!keys.length) {
+          if (!Object.keys(slots).length) {
             const none = document.createElement('div');
             none.style.cssText = 'color:var(--ink-muted);font-size:12px;margin-bottom:20px;';
             none.textContent = 'Sin espacios de conjuro a este nivel.';
@@ -1347,6 +1421,15 @@ export async function render(container) {
               card.innerHTML = `<div style="font-size:9px;font-weight:700;color:var(--gold-dim);text-transform:uppercase;margin-bottom:8px;">Nivel ${n}</div>
                 <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:4px;margin-bottom:8px;">${bubbles.join('')}</div>
                 <div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--gold);">${avail}/${total}</div>`;
+              if (canEdit && (sd.used ?? 0) > 0) {
+                const rb = document.createElement('button');
+                rb.className = 'btn';
+                rb.style.cssText = 'font-size:10px;padding:2px 6px;margin-top:6px;';
+                rb.textContent = '↺';
+                rb.title = 'Recuperar una ranura';
+                rb.addEventListener('click', () => restoreSlot(n, false));
+                card.appendChild(rb);
+              }
               grid.appendChild(card);
             }
             el.appendChild(grid);
@@ -1442,6 +1525,14 @@ export async function render(container) {
         prep.appendChild(cb);
         prep.appendChild(document.createTextNode('Preparado'));
         headRow.appendChild(prep);
+      }
+
+      if (canEdit) {
+        const castBtn = document.createElement('button');
+        castBtn.style.cssText = 'padding:3px 10px;border-radius:4px;font-size:11px;cursor:pointer;background:var(--gold-glow);color:var(--gold);border:1px solid var(--gold-dim);white-space:nowrap;';
+        castBtn.textContent = '✦ Lanzar';
+        castBtn.addEventListener('click', (e) => { e.stopPropagation(); openCastChooser(sp, sc, reload); });
+        headRow.appendChild(castBtn);
       }
 
       if (canEdit) {
@@ -1594,6 +1685,101 @@ export async function render(container) {
         if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
       });
       setTimeout(() => searchInput.focus(), 100);
+    }
+
+    function openCastChooser(sp, sc, reload) {
+      const doCast = async (slotLevel, asRitual, overlay) => {
+        if (sp.concentration && sc.concentrating_on && sc.concentrating_on !== sp.spell_id) {
+          if (!confirm('Este hechizo requiere concentración y terminará tu concentración actual. ¿Continuar?')) return;
+        }
+        try {
+          const bodyReq = { spell_id: sp.spell_id };
+          if (slotLevel) bodyReq.slot_level = slotLevel;
+          if (asRitual) bodyReq.as_ritual = true;
+          const r = await api.post(`/characters/${c.id}/cast`, bodyReq);
+          const d = r.data || {};
+          const msg = asRitual ? 'Lanzado como ritual'
+            : (sp.level === 0 ? 'Truco lanzado' : `Lanzado (nivel ${d.cast_level})`);
+          toast.success(msg, sp.name);
+          if (d.scaling_note) toast.info('A niveles superiores', d.scaling_note);
+          if (d.consumed_component) toast.info('Componente consumido', d.consumed_component);
+          if (d.replaced_concentration) toast.info('Concentración', 'Terminó: ' + d.replaced_concentration);
+          (d.warnings || []).forEach((w) => toast.info('Aviso', w));
+          if (overlay) overlay.remove();
+          reload();
+        } catch (err) { toast.error(err.message); }
+      };
+
+      /* Trucos: sin ranura, lanzamiento directo */
+      if (sp.level === 0) { doCast(null, false, null); return; }
+
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position:fixed;inset:0;background:rgba(9,8,10,0.85);backdrop-filter:blur(8px);z-index:2000;
+        display:flex;align-items:center;justify-content:center;padding:32px 16px;animation:fadeIn var(--dur-normal) var(--ease-smooth);
+      `;
+      const modal = document.createElement('div');
+      modal.style.cssText = 'background:var(--stone);border:1px solid var(--border);border-radius:12px;padding:24px;width:100%;max-width:380px;box-shadow:0 24px 64px rgba(0,0,0,0.3);';
+      modal.innerHTML = `<div style="font-family:var(--font-display);font-size:16px;font-weight:700;color:var(--ink);margin-bottom:4px;">✦ Lanzar «${sp.name}»</div>
+        <div style="font-size:11px;color:var(--ink-muted);margin-bottom:16px;">Elige con qué ranura lanzarlo${sp.concentration ? ' · requiere concentración' : ''}.</div>`;
+      const opts = document.createElement('div');
+      opts.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
+
+      const optBtn = (label, note, onClick, disabled) => {
+        const b = document.createElement('button');
+        b.className = 'btn';
+        b.disabled = !!disabled;
+        b.style.cssText = `text-align:left;padding:10px 14px;border:1px solid var(--border);${disabled ? 'opacity:0.45;cursor:not-allowed;' : 'cursor:pointer;'}`;
+        b.innerHTML = `<div style="font-size:13px;color:var(--ink);font-weight:600;">${label}</div>${note ? `<div style="font-size:11px;color:var(--ink-muted);">${note}</div>` : ''}`;
+        if (!disabled) b.addEventListener('click', onClick);
+        return b;
+      };
+
+      if (sc.caster_type === 'pact' && sc.pact_magic) {
+        const avail = sc.pact_magic.slots - (sc.pact_magic.used || 0);
+        opts.appendChild(optBtn(
+          `Ranura de pacto (nivel ${sc.pact_magic.slot_level})`,
+          `${avail} disponible(s)` + (sc.pact_magic.slot_level > sp.level ? ' · potenciado' : ''),
+          () => doCast(null, false, overlay), avail <= 0));
+      } else {
+        const slots = sc.spell_slots || {};
+        for (let n = sp.level; n <= 9; n++) {
+          const sd = slots[n] ?? slots[String(n)];
+          if (!sd) continue;
+          const avail = (sd.total ?? 0) - (sd.used ?? 0);
+          opts.appendChild(optBtn(
+            `Nivel ${n}`,
+            `${avail}/${sd.total} disponible(s)` + (n > sp.level ? ' · potenciado' : ''),
+            () => doCast(n, false, overlay), avail <= 0));
+        }
+      }
+
+      /* Ritual */
+      if (sp.ritual && ['bard', 'cleric', 'druid', 'wizard'].includes(sc.class_key)) {
+        opts.appendChild(optBtn('Como ritual', 'Sin gastar ranura · +10 min', () => doCast(null, true, overlay), false));
+      }
+
+      if (!opts.children.length) {
+        const none = document.createElement('div');
+        none.style.cssText = 'font-size:12px;color:var(--crimson);padding:8px 0;';
+        none.textContent = 'No tienes ranuras disponibles para lanzarlo.';
+        opts.appendChild(none);
+      }
+      modal.appendChild(opts);
+
+      const cancel = document.createElement('button');
+      cancel.className = 'btn';
+      cancel.style.cssText = 'width:100%;margin-top:16px;background:transparent;border:1px solid var(--border);color:var(--ink-muted);';
+      cancel.textContent = 'Cancelar';
+      cancel.addEventListener('click', () => overlay.remove());
+      modal.appendChild(cancel);
+
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+      document.addEventListener('keydown', function esc(e) {
+        if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
+      });
     }
 
     /* Animate after mount */
