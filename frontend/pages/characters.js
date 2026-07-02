@@ -286,9 +286,8 @@ export async function render(container) {
     const body = document.createElement('div');
     body.style.cssText = `
       position:absolute;left:0;right:0;bottom:0;padding:14px 16px;z-index:1;
-      background:rgba(255,255,255,0.72);
-      -webkit-backdrop-filter:blur(12px) saturate(1.1);backdrop-filter:blur(12px) saturate(1.1);
-      border-top:1px solid rgba(255,255,255,0.55);
+      background:rgba(255, 255, 255, 0.4);
+      -webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);
     `;
 
     const nameEl = document.createElement('div');
