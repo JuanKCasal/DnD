@@ -103,6 +103,65 @@
 }
 
 /* ============================================
+   FONDO MÁGICO — login (ver intro/fondo-magico.html)
+   Sello del gremio girando + runas + resplandor + chispas (canvas).
+   La sección REDUCED MOTION de más abajo desactiva todas estas animaciones.
+   ============================================ */
+.login-page {
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(120% 120% at 50% 38%, #f7f5ee 0%, #f1efe7 46%, #e9e5d8 100%);
+}
+.login-card { position: relative; z-index: 2; }
+
+.dnd-canvas {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none; z-index: 1;
+}
+.dnd-glow {
+  position: absolute; left: 50%; top: 50%;
+  width: min(78vmin, 560px); height: min(78vmin, 560px);
+  border-radius: 50%; pointer-events: none; z-index: 0;
+  background: radial-gradient(circle, rgba(180,146,58,0.30) 0%, rgba(180,146,58,0.10) 40%, rgba(180,146,58,0) 70%);
+  filter: blur(6px);
+  animation: dnd-pulse 7s ease-in-out infinite;
+}
+.dnd-seal {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(94vmin, 720px); height: min(94vmin, 720px);
+  z-index: 0; pointer-events: none;
+  animation: dnd-sealBreath 9s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px rgba(138,106,18,0.25));
+}
+.dnd-rot { transform-box: view-box; transform-origin: 300px 300px; }
+.dnd-cw70  { animation: dnd-spinCW  70s linear infinite; }
+.dnd-ccw96 { animation: dnd-spinCCW 96s linear infinite; }
+.dnd-cw74  { animation: dnd-spinCW  74s linear infinite; }
+.dnd-cw52  { animation: dnd-spinCW  52s linear infinite; }
+.dnd-rune {
+  position: absolute; font-family: 'Cinzel', serif; color: #b8923a;
+  z-index: 1; pointer-events: none;
+  text-shadow: 0 0 12px rgba(184,146,58,0.6);
+  animation: dnd-floatRune 12s ease-in-out infinite;
+}
+@keyframes dnd-spinCW  { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes dnd-spinCCW { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
+@keyframes dnd-pulse {
+  0%, 100% { opacity: 0.55; transform: translate(-50%, -50%) scale(1); }
+  50%      { opacity: 0.9;  transform: translate(-50%, -50%) scale(1.08); }
+}
+@keyframes dnd-sealBreath { 0%, 100% { opacity: 0.16; } 50% { opacity: 0.26; } }
+@keyframes dnd-floatRune {
+  0%   { transform: translateY(0)     rotate(0deg); opacity: 0; }
+  12%  { opacity: var(--peak, 0.5); }
+  50%  { transform: translateY(-46px) rotate(8deg); opacity: var(--peak, 0.5); }
+  88%  { opacity: var(--peak, 0.5); }
+  100% { transform: translateY(-92px) rotate(0deg); opacity: 0; }
+}
+
+/* ============================================
    REDUCED MOTION
    ============================================ */
 @media (prefers-reduced-motion: reduce) {

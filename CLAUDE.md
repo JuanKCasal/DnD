@@ -91,6 +91,9 @@ DnD/
 │   ├── dnd5e_character_creation_guide.md
 │   ├── dnd5e_equipment_guide.md   #   base de las fases I1–I6
 │   └── dnd5e_spells_guide.md      #   base de las fases H1–H6
+├── intro/                         # Fondo mágico del login (referencia autónoma)
+│   ├── fondo-magico.html          #   demo standalone (sello girando + runas + chispas)
+│   └── LEEME.md                   #   integrado en login.js + css/animations.css (.dnd-*)
 ├── .gitignore
 ├── Dockerfile                     # ⚠️ Dockerfile en raíz (copia api/ → ./api/)
 ├── reset_admin.py                 # Utilidad: resetear password de admin (BD)
