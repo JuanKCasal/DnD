@@ -94,17 +94,20 @@ export async function render(container) {
   buildMagicBackground(page);   // fondo animado del gremio (detrás de la tarjeta)
   page.appendChild(card);
   container.appendChild(page);
+  const applyMagicSizes = mountMagicResponsive(page, card);  // círculo siempre visible
   startMagicSparks(page.querySelector('#dndCanvas'));
 
   /* ---- Switch handlers ---- */
   switchToRegLink.addEventListener('click', () => {
     loginSection.style.display = 'none';
     registerSection.style.display = 'block';
+    applyMagicSizes();   // el formulario de registro es más alto: recalcular el círculo
   });
 
   switchToLoginLink.addEventListener('click', () => {
     registerSection.style.display = 'none';
     loginSection.style.display = 'block';
+    applyMagicSizes();
   });
 
   /* ---- Login submit ---- */
@@ -344,6 +347,31 @@ function buildMagicBackground(page) {
     r.style.cssText = `left:${left}%; top:${top}%; font-size:${size}px; --peak:${peak}; animation-duration:${dur}s; animation-delay:${delay}s;`;
     page.appendChild(r);
   });
+}
+
+// Ajusta el diámetro del sello para que SIEMPRE sea mayor que el alto del
+// formulario (≥125%), de modo que en móvil siempre asome parte del círculo por
+// encima/debajo de la tarjeta. Se recalcula en resize y al cambiar de formulario.
+function mountMagicResponsive(page, card) {
+  const seal = page.querySelector('.dnd-seal');
+  const glow = page.querySelector('.dnd-glow');
+
+  function apply() {
+    const vmin = Math.min(window.innerWidth, window.innerHeight);
+    const base = Math.min(0.94 * vmin, 720);        // equivalente a min(94vmin, 720px)
+    const cardH = card.offsetHeight || 0;
+    const size = Math.max(base, cardH * 1.25);      // ≥125% del alto del formulario
+    if (seal) { seal.style.width = size + 'px'; seal.style.height = size + 'px'; }
+    if (glow) { const g = size * 0.78; glow.style.width = g + 'px'; glow.style.height = g + 'px'; }
+  }
+
+  apply();
+  function onResize() {
+    if (!page.isConnected) { window.removeEventListener('resize', onResize); return; }
+    apply();
+  }
+  window.addEventListener('resize', onResize);
+  return apply;
 }
 
 // Chispas doradas en canvas. Se autolimpia (RAF + listener) al salir del login.
