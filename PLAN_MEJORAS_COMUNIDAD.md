@@ -1,6 +1,6 @@
 # Plan de Implementación — Sistema de Comunidad (Chat, Calendario & Eventos, Clanes, Salón de la Fama)
 
-> **Estado:** Propuesta · **Fecha:** 2026-07-02
+> **Estado:** ✅ IMPLEMENTADO (CM1–CM6) — pendiente de desplegar migraciones 014–017 desde PowerShell (ver CLAUDE.md, "Sistema de Comunidad CM1–CM6"). Entrega en vivo por polling; el puente Kafka→Discord queda como iteración futura. · **Fecha:** 2026-07-02
 > **Base:** Análisis de cómo funcionan las comunidades de D&D + los requisitos del usuario + el schema v2.0 (las tablas de chat, clanes, rangos y `event_log` **ya existen sin frontend**).
 > **Objetivo:** Convertir la app en una **comunidad viva**: un chat multi-canal donde **hablas como personaje** (no como usuario), muros sociales para eventos y clanes, y un Salón de la Fama con premios y valoración de DMs. Es la contraparte "social" del sistema de mesa (campañas C1–C7).
 

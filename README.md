@@ -217,10 +217,11 @@ Barra superior horizontal con mega-menú (`max-width: 1300px`):
 
 - **Dashboard** → `#/dashboard`
 - **Mi DnD:** Personajes `#/characters`, Inventario del jugador `#/inventory`
-- **Juego:** Campañas `#/campaigns`, Sesiones `#/sessions`, Tesoros `#/treasury`, Aventuras & Misiones `#/quests`, Encuentros `#/encounters`, Trama `#/narrative`
-- **Mundo:** Compendio `#/world`
+- **Juego:** Campañas `#/campaigns`, Sesiones `#/sessions`, Tesoros `#/treasury`, Aventuras & Misiones `#/quests`, Encuentros `#/encounters`, Trama `#/narrative`, Compendio `#/world`
+- **Comunidad:** Chat `#/chat`, Calendario & Eventos `#/calendario`, Clanes `#/clanes`, Salón de la Fama `#/fama`
 - **Configuración:** Miembros `#/members`, Catálogo `#/catalogue`, Catálogo de Hechizos `#/spellbook`
-- *Próximamente (deshabilitados):* Noticias, Perfil, Clanes, Salón de la Fama, Chat, Calendario, Event Log.
+- Cada usuario elige su **personaje activo** en la barra superior: es su identidad social en el chat y los clanes.
+- *Próximamente (deshabilitados):* Noticias, Perfil, Event Log.
 
 ---
 
@@ -247,7 +248,12 @@ Base: `/api/v1`. Respuestas: lista `{"data":[...], "meta":{...}}`, ítem `{"data
 | Session loot | `GET/POST/DELETE /sessions/{id}/loot`, `POST /sessions/{id}/loot/{loot}/award` |
 | Items / Spells | `GET/POST/PUT/DELETE /items` · `/spells` (mutaciones admin) |
 | Repertorio / Conjuración | `/characters/{id}/spells`, `/cast`, `/rest`, `/concentration`, `/spell-slots/restore` |
-| Otros (backend listo) | `/ranks`, `/clans`, `/chat`, `/events` |
+| Personaje activo | `GET/PUT /me/active-character` |
+| Chat | `GET/POST /chat/rooms`, `GET/POST /chat/rooms/{id}/messages`, `GET /chat/dm`, `GET/POST /chat/dm/{characterId}` |
+| Comunidad (muros) | `GET/POST/PUT/DELETE /community/posts` + `/comments`, `/react` |
+| Clanes | `GET/POST/PUT /clans` + `/invite` `/join` `/{id}/members` |
+| Salón de la Fama | `GET/POST/DELETE /hall/awards`, `GET /hall/leaderboard`, `POST /hall/ratings`, `GET /hall/dm-ratings` |
+| Otros (backend listo) | `/ranks`, `/events` |
 
 Docs interactivas: `/api/docs`.
 
@@ -275,6 +281,10 @@ python db/migrate.py 010_session_log          # C4
 python db/migrate.py 011_bestiary_encounters  # C5
 python db/migrate.py 012_combat_tracker       # C6
 python db/migrate.py 013_narrative_rewards    # C7
+python db/migrate.py 014_community_identity   # CM1 (clanes por personaje)
+python db/migrate.py 015_community_rooms      # CM2 (salas globales de chat)
+python db/migrate.py 016_community_walls      # CM4 (muros community_posts)
+python db/migrate.py 017_awards_ratings       # CM6 (premios + valoración DMs)
 
 # Seeds (idempotentes)
 python db/seed_items.py      # 216 ítems SRD
@@ -301,8 +311,12 @@ python fix_alignments.py     # normalizar alignment a enums (one-off)
 
 - **C1** metadatos, estados y progresión de campaña · **C2** aventuras + misiones · **C3** mundo vivo (NPCs/localizaciones/facciones) · **C4** bitácora de sesión (prep/cliffhanger/recap) + progresión XP/hitos · **C5** bestiario + encuentros + calculadora de dificultad del DMG · **C6** rastreador de combate (iniciativa/HP/condiciones/concentración) · **C7** arcos/giros + guía de recompensas, con visibilidad DM/jugador filtrada en el backend.
 
-**Backend listo, frontend pendiente:** Rangos, Clanes, Chat/DMs, Event Log.
+Y el **sistema de comunidad integral (CM1–CM6)**:
 
-**Pendiente / futuro:** mapas y tokens de batalla (canvas táctico), Salón de la Fama, Calendario & Eventos, perfil de usuario, dice roller flotante, consumer Kafka → Discord.
+- **CM1** identidad de personaje activo + visibilidad de canales + clanes por personaje · **CM2** chat multi-canal (con provisión automática de salas por campaña/clan, entrega en vivo por polling, IC/OOC, `/roll`, susurros) · **CM3** canales de sistema (Saludos + notificaciones de Fama) · **CM4** Calendario & Eventos (muro de Admin/DM) · **CM5** Clanes como muro social (posts, imágenes, ítems, comentarios) · **CM6** Salón de la Fama (premios a personajes + valoración de DMs + ranking).
 
-Ver `CLAUDE.md` para detalles técnicos y los planes por fases: `PLAN_MEJORAS_ITEMS.md` (ítems), `PLAN_MEJORAS_HECHIZOS.md` (hechizos) y `PLAN_MEJORAS_CAMPAÑAS.md` (campañas).
+**Backend listo, frontend pendiente:** Rangos, Event Log, perfil de usuario.
+
+**Pendiente / futuro:** mapas y tokens de batalla (canvas táctico), dice roller flotante global, consumer Kafka → Discord.
+
+Ver `CLAUDE.md` para detalles técnicos y los planes por fases: `PLAN_MEJORAS_ITEMS.md` (ítems), `PLAN_MEJORAS_HECHIZOS.md` (hechizos), `PLAN_MEJORAS_CAMPAÑAS.md` (campañas) y `PLAN_MEJORAS_COMUNIDAD.md` (comunidad).

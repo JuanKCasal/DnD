@@ -982,8 +982,19 @@ Luego `git add -A; git commit -m "feat: CM4 Calendario & Eventos (muro unificado
 - [x] Frontend `frontend/pages/clans.js` (`#/clanes`, "🛡️ Clanes" habilitado en **Comunidad**): descubrir/crear clanes (grid con emblema/color/lema), **perfil de clan** (banner, unirse, lista de miembros) y **muro social** (composer con texto/imagen/**compartir ítem** del catálogo, feed de publicaciones, comentarios).
 - [x] Verificado: `node --check` de `clans.js`/`router.js`; `clan_characters` en create/join/accept de `clans.py`.
 
-### Fase CM6 — Pendiente
-Ver `PLAN_MEJORAS_COMUNIDAD.md`: Salón de la Fama — premios a personajes (Admin/DM) + valoración de DMs por los jugadores + ranking (leaderboard con `member_xp`).
+### Fase CM6 — Salón de la Fama (premios + valoración de DMs + ranking) ✅ COMPLETADA (pendiente de desplegar)
+- [x] Migración `db/migrations/017_awards_ratings.sql` — `awards` (medallas a personajes: título, descripción, ícono, rareza, otorgado por) y `dm_ratings` (estrellas 1–5 + comentario, UNIQUE por campaña+jugador).
+- [x] Modelos `models/hall.py` (`AwardCreate`, `RatingCreate`). Router `api/routers/hall.py`: `POST/GET/DELETE /hall/awards` (otorgar solo Admin/DM → notifica en la sala `salon-fama` vía CM3), `GET /hall/leaderboard` (top por `member_xp`), `POST /hall/ratings` (valida participación; upsert por campaña), `GET /hall/dm-ratings` (promedio por DM), `GET /hall/my-ratings`. Registrado en `main.py`.
+- [x] Frontend `frontend/pages/hall.js` (`#/fama`, "🏆 Salón de la Fama" habilitado en **Comunidad**): pestañas **Proezas** (feed de medallas + otorgar), **Ranking** (leaderboard XP/sesiones/premios) y **Valorar DMs** (estrellas + comentario por campaña + ranking de DMs).
+- [x] Verificado: `ast.parse` de modelo/router; `node --check` de `hall.js`/`router.js`; registro en `main.py`.
+
+**⚠️ PENDIENTE DE DESPLIEGUE (CM6) — desde PowerShell:**
+```
+C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 017_awards_ratings
+```
+Luego `git add -A; git commit -m "feat: CM6 Salón de la Fama (premios + valoración de DMs + ranking)"; git push origin main`.
+
+> **Sistema de Comunidad CM1–CM6 COMPLETO.** Chat multi-canal con identidad de personaje (CM1–CM2), canales de sistema (CM3), Calendario & Eventos (CM4), Clanes como muro social (CM5) y Salón de la Fama (CM6). Migraciones 014–017 + el resto (007–016) pendientes de ejecutar en orden desde PowerShell.
 
 ---
 
