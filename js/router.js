@@ -7,6 +7,7 @@ const routes = {
   '#/characters': () => import('../pages/characters.js').then(m => m.render),
   '#/sessions':   () => import('../pages/sessions.js').then(m => m.render),
   '#/quests':     () => import('../pages/quests.js').then(m => m.render),
+  '#/world':      () => import('../pages/world.js').then(m => m.render),
   '#/inventory':  () => import('../pages/inventory.js').then(m => m.render),
   '#/treasury':   () => import('../pages/inventory.js').then(m => m.render),
   '#/catalogue':  () => import('../pages/inventory.js').then(m => m.render),
@@ -52,6 +53,7 @@ const NAV_GROUPS = [
     type: 'dropdown',
     label: 'Mundo',
     items: [
+      { icon: '🌍', label: 'Compendio',         desc: 'NPCs, lugares y facciones', route: '#/world'                },
       { icon: '🛡️', label: 'Clanes',            desc: 'Gremios y facciones',   route: '#/clanes',    disabled: true },
       { icon: '🏆', label: 'Salón de la Fama',  desc: 'Los mejores aventureros', route: '#/fama',     disabled: true },
     ],
