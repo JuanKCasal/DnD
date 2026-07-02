@@ -127,8 +127,9 @@ DnD/
 │       ├── login.js
 │       ├── dashboard.js           # 5 stats de comunidad en tiempo real
 │       ├── campaigns.js           # CRUD campañas + metadatos/progresión/reglas (C1);
-│       │                          #   modal de detalle con 7 pestañas (detalles/sesiones/quests/
-│       │                          #   encuentros/trama/DM/personajes) + reasignar DM + añadir personajes
+│       │                          #   modal de detalle con barra lateral de 9 pestañas (detalles/sesiones/
+│       │                          #   quests/encuentros/trama/compendio/tesoros/DM/personajes) +
+│       │                          #   reasignar DM + añadir personajes
 │       ├── characters.js          # Ficha D&D 5e + modal 5 tabs + panel de combate calculado (~1900 líneas)
 │       ├── sessions.js            # Timeline + detalle + asistencia + botín + cliffhanger/recap + progresión (C4)
 │       ├── quests.js              # #/quests — Aventuras & Misiones con visibilidad DM (C2)
@@ -314,9 +315,8 @@ Estructura del mega-menu (en `router.js`, constante `NAV_GROUPS`):
 - **Noticias** *(deshabilitado)*
 - **Dashboard** → `#/dashboard`
 - **Mi DnD:** Personajes `#/characters`, Inventario del Jugador `#/inventory` | Perfil *(deshabilitado)*
-- **Juego:** Campañas `#/campaigns`, Sesiones `#/sessions`, Tesoros `#/treasury` | Misiones *(deshabilitado)*
-- **Mundo:** Clanes, Salón de la Fama *(deshabilitados)*
-- **Comunidad:** Chat, Calendario & Eventos *(deshabilitados)*
+- **Juego:** Campañas `#/campaigns`, Sesiones `#/sessions`, Tesoros `#/treasury`, Aventuras & Misiones `#/quests`, Encuentros `#/encounters`, Trama `#/narrative`, Compendio `#/world`
+- **Comunidad:** Chat, Calendario & Eventos, Clanes, Salón de la Fama *(todos deshabilitados)*
 - **Configuración:** Miembros `#/members`, Catálogo `#/catalogue`, Catálogo de Hechizos `#/spellbook` | Event Log *(deshabilitado)*
 
 **Rutas de inventario — todas usan `inventory.js`, modo por hash:**

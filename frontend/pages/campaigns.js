@@ -560,12 +560,16 @@ export async function render(container) {
 
     const tabs = [
       ['details', '📋 Detalles'], ['sessions', '📜 Sesiones'], ['quests', '⚔️ Aventuras & Misiones'],
-      ['encounters', '🐉 Encuentros'], ['narrative', '🎭 Trama'], ['dm', '👑 DM'], ['characters', '🧙 Personajes'],
+      ['encounters', '🐉 Encuentros'], ['narrative', '🎭 Trama'], ['world', '🌍 Compendio'],
+      ['treasury', '💰 Tesoros'], ['dm', '👑 DM'], ['characters', '🧙 Personajes'],
     ];
+    // Barra lateral (vertical) de pestañas
+    const bodyRow = document.createElement('div');
+    bodyRow.style.cssText = 'display:flex;flex:1;min-height:0;';
     const tabBar = document.createElement('div');
-    tabBar.style.cssText = 'display:flex;gap:4px;padding:0 26px;border-bottom:1px solid var(--border);overflow-x:auto;';
+    tabBar.style.cssText = 'display:flex;flex-direction:column;gap:2px;padding:14px 10px;border-right:1px solid var(--border);overflow-y:auto;min-width:172px;flex-shrink:0;';
     const content = document.createElement('div');
-    content.style.cssText = 'padding:20px 26px;overflow-y:auto;';
+    content.style.cssText = 'flex:1;min-width:0;padding:20px 24px;overflow-y:auto;';
     let active = 'details';
     tabs.forEach(([id, label]) => {
       const b = document.createElement('button');
@@ -576,7 +580,8 @@ export async function render(container) {
     });
     function syncTabs() { tabBar.querySelectorAll('button').forEach(b => { b.style.cssText = tabBtnStyle(b.dataset.tab === active); }); }
 
-    modal.appendChild(head); modal.appendChild(tabBar); modal.appendChild(content);
+    bodyRow.appendChild(tabBar); bodyRow.appendChild(content);
+    modal.appendChild(head); modal.appendChild(bodyRow);
     overlay.appendChild(modal); document.body.appendChild(overlay);
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 
@@ -594,6 +599,8 @@ export async function render(container) {
         if (id === 'quests') return await renderQuests();
         if (id === 'encounters') return await renderEncounters();
         if (id === 'narrative') return await renderNarrative();
+        if (id === 'world') return await renderWorld();
+        if (id === 'treasury') return await renderTreasury();
         if (id === 'dm') return await renderDM();
         if (id === 'characters') return await renderCharacters();
       } catch (e) { content.innerHTML = `<div style="color:var(--crimson);padding:12px;">Error: ${escHtml(e.message)}</div>`; }
@@ -686,6 +693,33 @@ export async function render(container) {
       content.innerHTML = html;
     }
 
+    async function renderWorld() {
+      const [npcs, locs, facs] = await Promise.all([
+        api.get(`/campaigns/${cid}/npcs`).then(r => r.data ?? []).catch(() => []),
+        api.get(`/campaigns/${cid}/locations`).then(r => r.data ?? []).catch(() => []),
+        api.get(`/campaigns/${cid}/factions`).then(r => r.data ?? []).catch(() => []),
+      ]);
+      let html = countHead('NPCs', npcs.length);
+      html += npcs.length ? npcs.map(n => `<div style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;"><span style="color:var(--ink);">${escHtml(n.name)}</span> <span style="font-size:11px;color:var(--ink-muted);">${[n.race, n.npc_class, n.role].filter(Boolean).map(escHtml).join(' · ')}${n.dm_only ? ' · 🔒' : ''}</span></div>`).join('') : emptyMsg('Sin NPCs');
+      html += countHead('Localizaciones', locs.length);
+      html += locs.length ? locs.map(l => `<div style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;"><span style="color:var(--ink);">${escHtml(l.name)}</span> <span style="font-size:11px;color:var(--ink-muted);">· ${escHtml(l.type)}${l.is_discovered ? '' : ' · 🔒'}</span></div>`).join('') : emptyMsg('Sin localizaciones');
+      html += countHead('Facciones', facs.length);
+      html += facs.length ? facs.map(f => `<div style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;"><span style="color:var(--ink);">${escHtml(f.name)}</span>${f.alignment ? ` <span style="font-size:11px;color:var(--ink-muted);font-family:var(--font-mono);">· ${escHtml(f.alignment)}</span>` : ''}</div>`).join('') : emptyMsg('Sin facciones');
+      content.innerHTML = html;
+    }
+
+    async function renderTreasury() {
+      const t = (await api.get(`/campaigns/${cid}/treasury`)).data ?? { items: [], currency: {} };
+      const cur = t.currency || {};
+      const coins = [['platinum', 'pp'], ['gold', 'po'], ['electrum', 'pe'], ['silver', 'pa'], ['copper', 'pc']];
+      let html = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">' +
+        coins.map(([k, lbl]) => `<span style="font-family:var(--font-mono);font-size:13px;background:var(--stone-light);border:1px solid var(--border);border-radius:8px;padding:6px 10px;">${cur[k] ?? 0} <span style="color:var(--gold-dim);">${lbl}</span></span>`).join('') + '</div>';
+      const items = t.items || [];
+      html += countHead('Objetos del tesoro', items.length);
+      html += items.length ? items.map(it => `<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;"><span style="color:var(--ink);">${escHtml(it.name)}${it.quantity > 1 ? ` ×${it.quantity}` : ''}</span><span style="font-size:11px;color:var(--ink-muted);">${escHtml(it.rarity || '')}${it.value_gp ? ` · ${it.value_gp} po` : ''}</span></div>`).join('') : emptyMsg('Sin objetos en el tesoro');
+      content.innerHTML = html;
+    }
+
     async function renderDM() {
       const list = await getMembers();
       let html = `<div style="font-size:14px;color:var(--ink);margin-bottom:14px;">DM actual: <b style="color:var(--gold);">${escHtml(memberName(campaign.dm_id, list))}</b></div>`;
@@ -769,7 +803,7 @@ export async function render(container) {
 const LABEL_CSS = 'display:block;font-size:11px;font-weight:600;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 6px;';
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML; }
 function tabBtnStyle(active) {
-  return `padding:10px 12px;font-family:var(--font-ui);font-size:13px;white-space:nowrap;cursor:pointer;background:none;border:none;border-bottom:2px solid ${active ? 'var(--gold)' : 'transparent'};color:${active ? 'var(--gold)' : 'var(--ink-muted)'};font-weight:${active ? '600' : '400'};`;
+  return `display:block;width:100%;text-align:left;padding:9px 12px;border-radius:8px;font-family:var(--font-ui);font-size:13px;white-space:nowrap;cursor:pointer;border:none;background:${active ? 'var(--gold-glow)' : 'transparent'};color:${active ? 'var(--gold)' : 'var(--ink-muted)'};font-weight:${active ? '600' : '400'};`;
 }
 function countHead(t, n) { return `<div style="font-family:var(--font-display);font-size:15px;color:var(--ink);margin:14px 0 8px;">${t} <span style="color:var(--ink-faint);font-family:var(--font-mono);font-size:13px;">(${n})</span></div>`; }
 function emptyMsg(t) { return `<div style="color:var(--ink-muted);font-size:13px;padding:8px 0;">${t}.</div>`; }
