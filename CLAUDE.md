@@ -257,7 +257,7 @@ Estructura del mega-menu (en `router.js`, constante `NAV_GROUPS`):
 - **Juego:** Campañas `#/campaigns`, Sesiones `#/sessions`, Tesoros `#/treasury` | Misiones *(deshabilitado)*
 - **Mundo:** Clanes, Salón de la Fama *(deshabilitados)*
 - **Comunidad:** Chat, Calendario & Eventos *(deshabilitados)*
-- **Configuración:** Miembros `#/members`, Catálogo `#/catalogue` | Event Log *(deshabilitado)*
+- **Configuración:** Miembros `#/members`, Catálogo `#/catalogue`, Catálogo de Hechizos `#/spellbook` | Event Log *(deshabilitado)*
 
 **Rutas de inventario — todas usan `inventory.js`, modo por hash:**
 - `#/inventory` → modo `player` — equipamiento del jugador entre personajes
@@ -632,7 +632,14 @@ git push origin main
 **⚠️ PENDIENTE DE DESPLIEGUE (H2) — desde PowerShell:**
 `C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/seed_spells.py --dry-run` (revisar conteos) y luego `C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/seed_spells.py` (siembra). Después correr `db/migrate_spells_known.py` (migra repertorios existentes) y commitear también `db/data/srd_spells.json`.
 
-### Fase H3 — Catálogo en menú Configuración (pendiente)
+### Fase H3 — Catálogo en menú Configuración ✅ COMPLETADA
+- [x] `frontend/pages/spells.js`: página del catálogo (`export render`) — grid de tarjetas con color/ícono por escuela, meta rápida (tiempo/alcance/componentes), insignias (concentración, ritual, ataque, salvación, daño).
+- [x] Filtros: búsqueda (nombre ES/EN), nivel (0–9), escuela, clase, ritual/concentración. Debounce en búsqueda.
+- [x] **Modal de detalle** con toda la info de uso: nivel/escuela, tiempo, alcance, componentes + material, duración, salvación/ataque, daño, descripción (párrafos), "A niveles superiores", clases. Traductores ligeros de campos SRD (tCasting/tRange/tDuration).
+- [x] **CRUD admin** (solo rol admin): modal crear/editar con todos los campos (incl. checkboxes de clases y componentes) → `POST/PUT/DELETE /api/v1/spells`; recarga tras guardar.
+- [x] Ruta `#/spellbook` en `router.js` + entrada "📖 Catálogo de Hechizos" en el grupo **Configuración** de `NAV_GROUPS`.
+- [x] Verificado con `node --check` (spells.js y router.js).
+
 ### Fase H4 — Servicio de conjuración + cálculos (pendiente)
 ### Fase H5 — Equipar/preparar hechizos en la ficha (pendiente)
 ### Fase H6 — Refinamientos mecánicos + limpieza (pendiente)
