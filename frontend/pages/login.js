@@ -360,7 +360,7 @@ function mountMagicResponsive(page, card) {
     const vmin = Math.min(window.innerWidth, window.innerHeight);
     const base = Math.min(0.94 * vmin, 720);        // equivalente a min(94vmin, 720px)
     const cardH = card.offsetHeight || 0;
-    const size = Math.max(base, cardH * 1.25);      // ≥125% del alto del formulario
+    const size = Math.max(base, cardH * 1.5);       // ≥150% del alto del formulario (asoma más)
     if (seal) { seal.style.width = size + 'px'; seal.style.height = size + 'px'; }
     if (glow) { const g = size * 0.78; glow.style.width = g + 'px'; glow.style.height = g + 'px'; }
   }
