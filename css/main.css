@@ -89,7 +89,14 @@ body {
   left: 0;
   right: 0;
   height: var(--nav-height);
-  background: var(--void);
+  /* Transparente para mezclarse con el fondo animado; leve blur + degradado
+     hacia arriba para mantener legibilidad de los enlaces. */
+  background: linear-gradient(to bottom,
+    rgba(245, 243, 238, 0.72),
+    rgba(245, 243, 238, 0.32) 70%,
+    rgba(245, 243, 238, 0));
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   border-bottom: none;
   z-index: 200;
   display: flex;
