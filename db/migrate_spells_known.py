@@ -2,6 +2,9 @@
 DnD Community Manager — Migración de datos: spells_known → character_spells
 Fase H1 (se ejecuta DESPUÉS del seed de catálogo de la Fase H2).
 
+OBSOLETO tras la migración 006 (las columnas spells_known/cantrips_known se
+eliminan). Conservado como referencia histórica del proceso de migración.
+
 Lee characters.spells_known (JSONB) y characters.cantrips_known (TEXT[]),
 casa cada hechizo contra el catálogo `spells` por nombre (español o inglés)
 e inserta las filas en `character_spells`. Es idempotente (ON CONFLICT DO NOTHING).

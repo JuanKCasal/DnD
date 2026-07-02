@@ -120,7 +120,9 @@ DnD/
 │       ├── characters.js          # Ficha D&D 5e + modal 5 tabs + panel de combate calculado (~1900 líneas)
 │       ├── sessions.js            # Timeline + detalle con tabs + asistencia + botín (loot)
 │       ├── inventory.js           # Modo player/treasury/catalogue por hash; slots, sintonía, tienda, cargas, packs (~1400 líneas)
-│       └── members.js             # Grid de miembros + edición de rol
+│       ├── members.js             # Grid de miembros + edición de rol
+│       └── spells.js              # Catálogo de hechizos (#/spellbook): filtros, detalle,
+│                                  #   CRUD admin + enlace de componente consumible (H3/H6)
 │
 ├── api/                           # FastAPI → Railway
 │   ├── Dockerfile                 # ⚠️ Segundo Dockerfile (copia . → ./api/) — redundante con el de raíz
@@ -145,10 +147,14 @@ DnD/
 │   │   ├── rank.py                # RankCreate, RankUpdate, RankOut
 │   │   ├── clan.py                # ClanCreate, ClanUpdate, ClanOut, ClanInvitationCreate
 │   │   ├── chat.py                # ChatRoom*, ChatMessage*, DirectMessage*
-│   │   └── event.py               # EventLogOut
-│   ├── services/                  # Lógica de dominio pura (Fases I4–I5)
+│   │   ├── event.py               # EventLogOut
+│   │   └── spell_model.py         # SpellCreate/Update/Out, CharacterSpellAdd/Update,
+│   │                              #   SpellCastRequest, RestRequest, ConcentrationSet (Fases H1/H6)
+│   ├── services/                  # Lógica de dominio pura (Fases I4–I5, H4)
 │   │   ├── character_mechanics.py # compute_combat: CA efectiva, velocidad, sigilo, ataques
-│   │   └── economy.py             # conversión de moneda (cp), peso de monedas, carga/encumbramiento
+│   │   ├── economy.py             # conversión de moneda (cp), peso de monedas, carga/encumbramiento
+│   │   └── spellcasting.py        # compute_spellcasting: CD/ataque, ranuras full/half/third/pact,
+│   │                              #   límites, disponibilidad (can_learn) — clase ES→canónica
 │   └── routers/
 │       ├── auth.py                # POST /login, /register
 │       ├── members.py             # GET/POST/PUT /members (POST admin-only)
@@ -161,14 +167,24 @@ DnD/
 │       ├── ranks.py               # CRUD /ranks
 │       ├── clans.py               # CRUD /clans + membership + invitations
 │       ├── chat.py                # GET/POST /chat/rooms + /messages + DMs
-│       └── events.py              # GET /events (event log público)
+│       ├── events.py              # GET /events (event log público)
+│       └── spells.py              # /spells (catálogo CRUD admin), repertorio del personaje
+│                                  #   (/characters/{id}/spells), cast/rest/concentration,
+│                                  #   spell-slots/restore  (Fases H1/H5/H6)
 │
 ├── db/
 │   ├── migrate.py                 # Runner de migraciones (acepta nombre por CLI)
 │   ├── seed_items.py              # Seeder idempotente del catálogo SRD (216 ítems)
+│   ├── seed_spells.py             # Seeder idempotente de hechizos SRD (319) — cachea db/data/srd_spells.json
+│   ├── migrate_spells_known.py    # Migración de datos (obsoleto tras 006)
+│   ├── data/
+│   │   └── srd_spells.json        # Cache versionada de la SRD 5.1 (fuente del seed)
 │   └── migrations/
 │       ├── 001_initial_schema.sql # Schema v2.0 completo (656 líneas)
-│       └── 003_equipment_slots.sql# Columna character_inventory.slot (Fase I3)
+│       ├── 003_equipment_slots.sql# Columna character_inventory.slot (Fase I3)
+│       ├── 004_spells.sql         # enum spell_school + tablas spells y character_spells (H1)
+│       ├── 005_spellcasting_state.sql # characters.concentrating_on + spells.material_item_id (H6)
+│       └── 006_drop_deprecated_spell_columns.sql # DROP spells_known/cantrips_known (H6)
 │                                  # (no hay 002: el seed es el script standalone seed_items.py)
 │
 └── .github/
@@ -283,6 +299,8 @@ alignment_type:  'LG'|'NG'|'CG'|'LN'|'TN'|'CN'|'LE'|'NE'|'CE'
 invite_status:   'pending' | 'accepted' | 'rejected'
 item_type:       'weapon'|'armor'|'potion'|'spell_scroll'|'ring'|'rod'|'staff'|'wand'|
                  'wondrous'|'tool'|'ammunition'|'gear'|'treasure'|'vehicle'|'other'
+spell_school:    'abjuration'|'conjuration'|'divination'|'enchantment'|
+                 'evocation'|'illusion'|'necromancy'|'transmutation'   (Fase H1)
 item_rarity:     'common'|'uncommon'|'rare'|'very_rare'|'legendary'|'artifact'
 chat_room_type:  'general'|'clan'|'rank'|'campaign'|'dm_channel'|'ooc'|'announcements'
 message_type:    'ic'|'ooc'|'dice'|'emote'|'system'|'whisper'
@@ -309,9 +327,11 @@ characters          (id, member_id→members, campaign_id→campaigns, name, rac
                      background, alignment::alignment_type, deity, level 1-20, xp, inspiration,
                      str, dex, con, int, wis, cha,
                      hp, max_hp, temp_hp, ac, initiative_bonus, speed, prof_bonus, passive_perception,
-                     spell_slots JSONB, conditions TEXT[], feats JSONB, saving_throws JSONB, skills JSONB,
+                     spell_slots JSONB (used), pact_magic JSONB (used), spellcasting_ability,
+                     concentrating_on→spells (H6), conditions TEXT[], feats JSONB, saving_throws JSONB, skills JSONB,
                      portrait_url, backstory, personality_traits, ideals, bonds, flaws, notes,
                      active, created_at)
+                     -- H6: eliminadas spells_known (JSONB) y cantrips_known (TEXT[]); repertorio en character_spells
 character_currency  (character_id→characters PK, pp, gp, ep, sp, cp)
 
 sessions            (id, campaign_id→campaigns, session_number AUTO, title, date, duration_minutes,
@@ -324,6 +344,15 @@ items               (id, name, description, type::item_type, rarity::item_rarity
 character_inventory (character_id, item_id PK, quantity, equipped, attuned, notes, custom_name)
 campaign_treasury   (campaign_id, item_id PK, quantity, notes, updated_at)
 campaign_currency   (campaign_id→campaigns PK, pp, gp, ep, sp, cp, notes)
+
+spells              (id, name (ES), name_en, level 0-9, school::spell_school, casting_time(_type),
+                     range_text/type/feet, comp_verbal/somatic/material, material_description,
+                     material_cost_gp, material_consumed, material_item_id→items (H6),
+                     duration, concentration, ritual, description, higher_levels,
+                     requires_attack_roll, saving_throw, damage_dice/type/scaling,
+                     classes TEXT[] (GIN), source_book, dnd5eapi_index UNIQUE)      -- catálogo global (H1)
+character_spells    (character_id→characters, spell_id→spells PK, is_prepared,
+                     is_always_known, source, notes, added_at)                      -- repertorio (H1)
 
 chat_rooms          (id, name, slug, type::chat_room_type, clan_id, campaign_id, rank_required_id,
                      description, icon, is_readonly, is_ic, sort_order)
@@ -655,8 +684,10 @@ git push origin main
 
 **Nota:** `characters.spell_slots` sigue guardando el estado `used`; el endpoint `/spellcasting` fusiona totales calculados con ese `used`. La columna `characters.spells_known` (JSONB) queda deprecada (se elimina en H6).
 
-### Fase H6 — Refinamientos mecánicos ✅ COMPLETADA (parcial; limpieza pendiente)
-Alcance elegido: ranuras+descansos, concentración, rituales+upcasting asistido y **coste de componentes**. (La eliminación de columnas deprecadas `spells_known`/`cantrips_known` queda pendiente.)
+### Fase H6 — Refinamientos mecánicos + limpieza ✅ COMPLETADA
+Alcance: ranuras+descansos, concentración, rituales+upcasting asistido, **coste de componentes** y **limpieza de columnas deprecadas**.
+- [x] Migración `006_drop_deprecated_spell_columns.sql`: elimina `characters.spells_known` (JSONB) y `cantrips_known` (TEXT[]); el repertorio vive en `character_spells`. `db/migrate_spells_known.py` queda como referencia histórica (obsoleto).
+- [x] **Estética de fichas** (`characters.js`): el retrato del personaje cubre el 100% de la tarjeta (fondo) y el bloque de datos (nombre, clase, HP, características) usa un panel con `backdrop-filter: blur` para legibilidad sobre la imagen.
 - [x] Migración `005_spellcasting_state.sql`: `characters.concentrating_on UUID` (→spells) y `spells.material_item_id UUID` (→items, ítem consumible enlazado).
 - [x] **Backend** (`spells.py`): `POST /characters/{id}/cast` (gasta ranura o pacto, **upcasting** con `slot_level`, **ritual** sin ranura, fija **concentración** reemplazando la previa, **consume el componente** enlazado y bloquea si falta), `POST /characters/{id}/rest` (corto=pacto, largo=todo+concentración), `PUT /characters/{id}/concentration`, `POST /characters/{id}/spell-slots/restore`. Modelos `SpellCastRequest/RestRequest/ConcentrationSet`.
 - [x] `/spellcasting` ahora incluye `concentrating_on` y el `used` de pacto.
@@ -671,8 +702,9 @@ Alcance elegido: ranuras+descansos, concentración, rituales+upcasting asistido 
 ```
 C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 005_spellcasting_state
 C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/seed_spells.py
+C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 006_drop_deprecated_spell_columns
 ```
-Luego `git add -A; git commit -m "feat: H6 lanzamiento/descansos/concentración/upcasting + coste de componentes"; git push origin main`.
+Luego `git add -A; git commit -m "feat: H6 lanzamiento/descansos/concentración/upcasting + coste de componentes + limpieza"; git push origin main`.
 
 ---
 
