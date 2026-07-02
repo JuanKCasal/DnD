@@ -16,6 +16,42 @@ async function getMarked() {
   return window.marked;
 }
 
+/* ── Helpers ───────────────────────────────────────────────────── */
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML; }
+function truncate(s, n) { s = s ?? ''; return s.length > n ? s.slice(0, n).trimEnd() + '…' : s; }
+
+function renderProgression(p) {
+  if (!p) return '';
+  const bpc = `<span title="Bono de competencia" style="font-family:var(--font-mono);color:var(--ink-muted);">BPC +${p.proficiency_bonus}</span>`;
+  if (p.leveling_method === 'milestone') {
+    const tgt = p.target_end_level ? ` → ${p.target_end_level}` : '';
+    return `<div style="background:var(--stone);border:1px solid var(--border);border-radius:10px;padding:14px 18px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;">
+      <span style="font-family:var(--font-display);color:var(--gold);">Progresión por hitos</span>
+      <span style="font-family:var(--font-mono);color:var(--ink);">Nivel ${p.current_level}${tgt}</span>
+      ${bpc}
+    </div>`;
+  }
+  const suggest = (p.suggested_level && p.suggested_level > p.current_level)
+    ? `<span style="color:var(--success);font-weight:600;">↑ Sugerido: subir a nivel ${p.suggested_level}</span>`
+    : `<span style="color:var(--ink-muted);">Nivel adecuado</span>`;
+  const nextTxt = p.next_level
+    ? `${p.xp_needed_for_next} XP para nivel ${p.next_level}`
+    : 'Nivel máximo';
+  return `<div style="background:var(--stone);border:1px solid var(--border);border-radius:10px;padding:14px 18px;">
+    <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+      <span style="font-family:var(--font-display);color:var(--gold);">Progresión por XP</span>
+      <span style="font-family:var(--font-mono);color:var(--ink);">Nivel ${p.current_level}</span>
+      <span style="font-family:var(--font-mono);color:var(--gold-dim);">${p.total_xp.toLocaleString('es-CL')} XP</span>
+      ${bpc}
+      ${suggest}
+    </div>
+    <div style="height:8px;background:var(--stone-light);border-radius:4px;overflow:hidden;">
+      <div style="height:100%;width:${p.pct_to_next ?? 0}%;background:var(--gold);"></div>
+    </div>
+    <div style="font-size:11px;color:var(--ink-faint);margin-top:4px;">${nextTxt}</div>
+  </div>`;
+}
+
 /* ── MAIN RENDER ────────────────────────────────────────────────── */
 export async function render(container) {
   container.innerHTML = '';
@@ -71,13 +107,28 @@ export async function render(container) {
   header.appendChild(titleBlock);
   header.appendChild(controls);
 
+  /* ── Progression panel (visible al filtrar por campaña) ── */
+  const progPanel = document.createElement('div');
+  progPanel.id = 'sessions-progression';
+  progPanel.style.cssText = 'margin-bottom:20px;';
+
   /* ── Timeline list ── */
   const list = document.createElement('div');
   list.id = 'sessions-list';
 
   page.appendChild(header);
+  page.appendChild(progPanel);
   page.appendChild(list);
   container.appendChild(page);
+
+  async function loadProgression() {
+    const campId = campSelect.value;
+    if (!campId) { progPanel.innerHTML = ''; return; }
+    try {
+      const res = await api.get(`/campaigns/${campId}/progression`);
+      progPanel.innerHTML = renderProgression(res.data);
+    } catch (_) { progPanel.innerHTML = ''; }
+  }
 
   /* ── Load campaigns for selector ── */
   let campaigns = [];
@@ -101,6 +152,7 @@ export async function render(container) {
   async function loadSessions() {
     list.innerHTML = '<div style="color:var(--ink-muted);padding:40px;text-align:center;">Cargando sesiones...</div>';
     const campId = campSelect.value;
+    loadProgression();
     const query = campId ? `?campaign_id=${campId}&per_page=50` : '?per_page=50';
     try {
       const res = await api.get(`/sessions${query}`);
@@ -359,6 +411,7 @@ export async function render(container) {
       if (id === 'chronicle') {
         if (session.summary) {
           getMarked().then(marked => {
+            if (activeTab !== 'chronicle') return;
             const prose = document.createElement('div');
             prose.className = 'chronicle-prose';
             prose.style.cssText = `
@@ -369,11 +422,34 @@ export async function render(container) {
             tabContent.appendChild(prose);
           });
         } else {
-          tabContent.innerHTML = `<div style="text-align:center;padding:40px;color:var(--ink-muted);">
-            <div style="font-size:32px;margin-bottom:12px;">📜</div>
-            <div>Sin crónica registrada</div>
-          </div>`;
+          const none = document.createElement('div');
+          none.style.cssText = 'text-align:center;padding:40px;color:var(--ink-muted);';
+          none.innerHTML = '<div style="font-size:32px;margin-bottom:12px;">📜</div><div>Sin crónica registrada</div>';
+          tabContent.appendChild(none);
         }
+
+        if (session.cliffhanger) {
+          const cf = document.createElement('div');
+          cf.style.cssText = 'margin-top:20px;padding:14px 16px;border-left:3px solid var(--crimson);background:var(--crimson-dim);border-radius:8px;';
+          cf.innerHTML = `<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--crimson);font-weight:600;margin-bottom:4px;">⚑ Cliffhanger</div><div style="font-size:14px;color:var(--ink);line-height:1.5;">${escHtml(session.cliffhanger)}</div>`;
+          tabContent.appendChild(cf);
+        }
+
+        /* Recap de la sesión anterior (guía §15.2) */
+        api.get(`/sessions/${session.id}/recap`).then(res => {
+          if (activeTab !== 'chronicle') return;
+          const r = res.data;
+          if (!r) return;
+          const box = document.createElement('div');
+          box.style.cssText = 'margin-bottom:20px;padding:14px 16px;border:1px dashed var(--border);border-radius:8px;background:var(--stone-light);';
+          const quests = (r.quests_advanced || []).length
+            ? `<div style="font-size:12px;color:var(--ink-muted);margin-top:6px;">Misiones: ${r.quests_advanced.map(escHtml).join(', ')}</div>` : '';
+          box.innerHTML = `<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--gold-dim);font-weight:600;margin-bottom:4px;">↩ Resumen de la sesión anterior (#${r.session_number})</div>
+            ${r.summary ? `<div style="font-size:13px;color:var(--ink-muted);line-height:1.6;">${escHtml(truncate(r.summary, 300))}</div>` : ''}
+            ${r.cliffhanger ? `<div style="font-size:13px;color:var(--crimson);margin-top:6px;">⚑ ${escHtml(r.cliffhanger)}</div>` : ''}
+            ${quests}`;
+          tabContent.prepend(box);
+        }).catch(() => {});
       }
 
       if (id === 'highlights') {
@@ -798,6 +874,23 @@ export async function render(container) {
     fgSum.appendChild(mdHint);
     body.appendChild(fgSum);
 
+    /* Cliffhanger */
+    const fgCliff = fieldGroup('Cliffhanger (con qué quedó la cosa)');
+    const cliffInput = input('text', 'cliffhanger', 'El grupo despierta rodeado de niebla...', session?.cliffhanger || '');
+    fgCliff.appendChild(cliffInput);
+    body.appendChild(fgCliff);
+
+    /* Prep notes (privadas del DM) */
+    const fgPrep = fieldGroup('Notas de preparación (privadas del DM)');
+    const prepTextarea = document.createElement('textarea');
+    prepTextarea.name = 'prep_notes';
+    prepTextarea.placeholder = 'Encuentros planificados, recordatorios, ganchos...';
+    prepTextarea.value = session?.prep_notes || '';
+    prepTextarea.rows = 3;
+    applyTextareaStyle(prepTextarea);
+    fgPrep.appendChild(prepTextarea);
+    body.appendChild(fgPrep);
+
     /* Footer buttons */
     const footer = document.createElement('div');
     footer.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;padding:0 28px 24px;';
@@ -823,6 +916,8 @@ export async function render(container) {
         highlights,
         summary: sumTextarea.value.trim() || null,
         adventure_id: advSel.value || null,
+        cliffhanger: cliffInput.value.trim() || null,
+        prep_notes: prepTextarea.value.trim() || null,
       };
 
       if (!isEdit) {
