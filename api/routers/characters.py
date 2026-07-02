@@ -8,6 +8,7 @@ from api.dependencies import get_current_user, get_db
 from api.db.helpers import item_response, list_response, log_event, paginate, records_to_list
 from api.db.kafka import TOPIC_CHARACTERS_LEVELED_UP, TOPIC_INVENTORY_UPDATED, publish_event
 from api.services.character_mechanics import compute_combat
+from api.services.spellcasting import compute_spellcasting
 from api.models.character import (
     CharacterCreate,
     CharacterUpdate,
@@ -359,6 +360,49 @@ async def get_character_combat(
         char_id,
     )
     result = compute_combat(dict(char), [dict(r) for r in equipped])
+    return item_response(result)
+
+
+@router.get("/{char_id}/spellcasting", response_model=dict)
+async def get_character_spellcasting(
+    char_id: uuid.UUID,
+    conn: asyncpg.Connection = Depends(get_db),
+    _: dict = Depends(get_current_user),
+):
+    """Estado de conjuración derivado por clase/nivel (Fase H4). No persiste."""
+    char = await conn.fetchrow(
+        """
+        SELECT c.class AS char_class, c.subclass, c.level, c.prof_bonus,
+               c.str AS str_score, c.dex AS dex_score, c.con AS con_score,
+               c.int AS int_score, c.wis AS wis_score, c.cha AS cha_score,
+               c.spell_slots, c.pact_magic
+        FROM characters c WHERE c.id = $1 AND c.active = TRUE
+        """,
+        char_id,
+    )
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found")
+
+    result = compute_spellcasting(dict(char))
+
+    # Fusionar los totales calculados con el "used" almacenado en el personaje
+    if result.get("is_caster") and result.get("caster_type") != "pact":
+        stored = char["spell_slots"]
+        if isinstance(stored, str):
+            try:
+                stored = json.loads(stored)
+            except (ValueError, TypeError):
+                stored = {}
+        stored = stored or {}
+        merged = {}
+        for lvl, total in result.get("spell_slots", {}).items():
+            used = 0
+            entry = stored.get(lvl) or stored.get(str(lvl))
+            if isinstance(entry, dict):
+                used = int(entry.get("used") or 0)
+            merged[lvl] = {"total": total, "used": min(used, total)}
+        result["spell_slots"] = merged
+
     return item_response(result)
 
 

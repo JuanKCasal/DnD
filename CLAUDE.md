@@ -640,7 +640,13 @@ git push origin main
 - [x] Ruta `#/spellbook` en `router.js` + entrada "📖 Catálogo de Hechizos" en el grupo **Configuración** de `NAV_GROUPS`.
 - [x] Verificado con `node --check` (spells.js y router.js).
 
-### Fase H4 — Servicio de conjuración + cálculos (pendiente)
+### Fase H4 — Servicio de conjuración + cálculos ✅ COMPLETADA
+- [x] `api/services/spellcasting.py` (lógica pura): `class_key()` mapea `characters.class` (ES/EN + subclase para EK/AT) → clave canónica; tablas de ranuras full/half/third/pact (documento §3); `spell_save_dc`/`spell_attack_bonus`; `spell_slots_for`/`pact_slots_for`; `max_cantrips`/`max_spells_known`/`max_spells_prepared`/`max_spell_level`; `cantrip_dice_count`; `can_learn(spell, key, level)` (disponibilidad por lista de clase + nivel); `compute_spellcasting(char)`.
+- [x] `GET /api/v1/characters/{id}/spellcasting` (en `characters.py`): estado derivado (no persiste); fusiona los totales calculados con el `used` guardado en `characters.spell_slots`.
+- [x] Verificado con tests de reglas: Mago N5 INT16 → CD14/+6/[4,3,2]/máx3/prep8; Mago N1 (ejemplo doc) → CD13/+5; Brujo N5 → pacto 2×N3/conocidos6; Paladín N1 no lanza, N5 [4,2]/prep5; Caballero Arcano N7 → [4,2]; `can_learn` por clase/nivel; escalado de trucos 1/2/3/4.
+
+**Mapa de clase ES→canónica** (en `class_key`): mago→wizard, clérigo→cleric, druida→druid, paladín→paladin, explorador→ranger, bardo→bard, hechicero→sorcerer, brujo→warlock; Guerrero/Pícaro solo lanzan si su subclase es Caballero Arcano / Pícaro Arcano.
+
 ### Fase H5 — Equipar/preparar hechizos en la ficha (pendiente)
 ### Fase H6 — Refinamientos mecánicos + limpieza (pendiente)
 
