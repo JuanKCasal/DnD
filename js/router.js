@@ -10,6 +10,7 @@ const routes = {
   '#/treasury':   () => import('../pages/inventory.js').then(m => m.render),
   '#/catalogue':  () => import('../pages/inventory.js').then(m => m.render),
   '#/members':    () => import('../pages/members.js').then(m => m.render),
+  '#/spellbook':  () => import('../pages/spells.js').then(m => m.render),
 };
 
 /* ============================================
@@ -68,6 +69,7 @@ const NAV_GROUPS = [
     items: [
       { icon: '👥', label: 'Miembros',   desc: 'Jugadores y roles',                route: '#/members'              },
       { icon: '📦', label: 'Catálogo',   desc: 'Items disponibles en la comunidad', route: '#/catalogue'            },
+      { icon: '📖', label: 'Catálogo de Hechizos', desc: 'Conjuros de la comunidad', route: '#/spellbook'           },
       { icon: '📋', label: 'Event Log',  desc: 'Historial de eventos',             route: '#/eventlog', disabled: true },
     ],
   },
