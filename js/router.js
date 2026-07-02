@@ -11,6 +11,7 @@ const routes = {
   '#/world':      () => import('../pages/world.js').then(m => m.render),
   '#/encounters': () => import('../pages/encounters.js').then(m => m.render),
   '#/narrative':  () => import('../pages/narrative.js').then(m => m.render),
+  '#/chat':       () => import('../pages/chat.js').then(m => m.render),
   '#/inventory':  () => import('../pages/inventory.js').then(m => m.render),
   '#/treasury':   () => import('../pages/inventory.js').then(m => m.render),
   '#/catalogue':  () => import('../pages/inventory.js').then(m => m.render),
@@ -59,7 +60,7 @@ const NAV_GROUPS = [
     type: 'dropdown',
     label: 'Comunidad',
     items: [
-      { icon: '💬', label: 'Chat',                  desc: 'Mensajería en tiempo real', route: '#/chat',       disabled: true },
+      { icon: '💬', label: 'Chat',                  desc: 'Canales y susurros de personaje', route: '#/chat' },
       { icon: '📅', label: 'Calendario & Eventos',  desc: 'Próximas sesiones',         route: '#/calendario', disabled: true },
       { icon: '🛡️', label: 'Clanes',            desc: 'Gremios y facciones',     route: '#/clanes',     disabled: true },
       { icon: '🏆', label: 'Salón de la Fama',  desc: 'Los mejores aventureros', route: '#/fama',       disabled: true },
