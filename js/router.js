@@ -4,6 +4,7 @@ import { api } from './api.js';
 const routes = {
   '#/login':      () => import('../pages/login.js').then(m => m.render),
   '#/dashboard':  () => import('../pages/dashboard.js').then(m => m.render),
+  '#/perfil':     () => import('../pages/profile.js').then(m => m.render),
   '#/campaigns':  () => import('../pages/campaigns.js').then(m => m.render),
   '#/characters': () => import('../pages/characters.js').then(m => m.render),
   '#/sessions':   () => import('../pages/sessions.js').then(m => m.render),
@@ -41,7 +42,7 @@ const NAV_GROUPS = [
     type: 'dropdown',
     label: 'Mi DnD',
     items: [
-      { icon: '👤', label: 'Perfil',      desc: 'Tu cuenta y preferencias', route: '#/perfil',    disabled: true },
+      { icon: '👤', label: 'Perfil',      desc: 'Tu cuenta y preferencias', route: '#/perfil' },
       { icon: '🧙', label: 'Personajes',        desc: 'Fichas y stats',                route: '#/characters'  },
       { icon: '🎒', label: 'Inventario', desc: 'Tu equipamiento entre personajes', route: '#/inventory' },
     ],
