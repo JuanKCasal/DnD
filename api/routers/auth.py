@@ -13,6 +13,7 @@ from api.dependencies import (
 )
 from api.config import get_settings
 from api.db.helpers import item_response, log_event
+from api.services.community_feed import post_system_message
 from api.models.auth import LoginRequest, TokenResponse
 from api.models.member import MemberCreate
 
@@ -65,6 +66,7 @@ async def register(
         actor_member_id=str(member_id),
         is_public=True,
     )
+    await post_system_message(conn, "saludos", member_id, f"👋 ¡{display_name} se unió al gremio!")
 
     settings = get_settings()
     token = create_access_token({"sub": str(member_id), "role": "player"})

@@ -954,8 +954,17 @@ C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 
 ```
 Luego `git add -A; git commit -m "feat: CM2 chat multi-canal (identidad de personaje, provisión de salas, entrega en vivo, susurros)"; git push origin main`.
 
-### Fases CM3–CM6 — Pendientes
-Ver `PLAN_MEJORAS_COMUNIDAD.md`: CM3 canales de sistema (Saludos/Fama) · CM4 Calendario & Eventos · CM5 Clanes como muro social · CM6 Salón de la Fama (premios + valoración de DMs).
+### Fase CM3 — Canales de sistema (Saludos + notificaciones de Fama) ✅ COMPLETADA
+- [x] Servicio `api/services/community_feed.py` → `post_system_message(conn, room_slug, member_id, text)`: inserta un mensaje `message_type='system'` (sin personaje) en una sala por slug; best-effort (no rompe el flujo).
+- [x] **Saludos:** `auth.register` publica "👋 ¡{nombre} se unió al gremio!"; `characters.create` publica "🎭 ¡Ha nacido {personaje}…!" en la sala `saludos`.
+- [x] **Salón de la Fama:** `characters.update` publica "⭐ ¡{personaje} alcanzó el nivel N!" en `salon-fama` cuando sube de nivel (los premios de CM6 también publicarán aquí).
+- [x] Frontend `chat.js`: los mensajes `system` se renderizan como línea centrada tipo "badge" (sin autor).
+- [x] Sin migración (usa las salas de CM2). Verificado: `ast.parse` de `community_feed.py`, `node --check` de `chat.js`, hooks presentes en `auth.py`/`characters.py`.
+
+> Nota: implementado con **llamadas directas** en los endpoints (no requiere el consumidor Kafka). El puente Kafka→Discord queda para una iteración futura.
+
+### Fases CM4–CM6 — Pendientes
+Ver `PLAN_MEJORAS_COMUNIDAD.md`: CM4 Calendario & Eventos · CM5 Clanes como muro social · CM6 Salón de la Fama (premios + valoración de DMs).
 
 ---
 

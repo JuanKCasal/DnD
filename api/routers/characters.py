@@ -9,6 +9,7 @@ from api.db.helpers import item_response, list_response, log_event, paginate, re
 from api.db.kafka import TOPIC_CHARACTERS_LEVELED_UP, TOPIC_INVENTORY_UPDATED, publish_event
 from api.services.character_mechanics import compute_combat
 from api.services.spellcasting import compute_spellcasting
+from api.services.community_feed import post_system_message
 from api.models.character import (
     CharacterCreate,
     CharacterUpdate,
@@ -147,6 +148,11 @@ async def create_character(
         target_id=str(char_id), target_name=body.name,
         actor_member_id=str(current_user["id"]), is_public=True,
     )
+    _desc = " ".join(x for x in [body.race, body.char_class] if x).strip()
+    await post_system_message(
+        conn, "saludos", current_user["id"],
+        f"🎭 ¡Ha nacido {body.name}{(', ' + _desc) if _desc else ''}, nivel {body.level}!",
+    )
     row = await conn.fetchrow(_character_select() + " WHERE c.id = $1", char_id)
     return item_response(dict(row))
 
@@ -237,6 +243,8 @@ async def update_character(
             target_id=str(char_id), actor_member_id=str(current_user["id"]),
             after={"level": new_level}, is_public=True,
         )
+        _nm = await conn.fetchval("SELECT name FROM characters WHERE id = $1", char_id)
+        await post_system_message(conn, "salon-fama", row["member_id"], f"⭐ ¡{_nm} alcanzó el nivel {new_level}!")
 
     row = await conn.fetchrow(_character_select() + " WHERE c.id = $1", char_id)
     return item_response(dict(row))
