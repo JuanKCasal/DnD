@@ -84,6 +84,13 @@ DnD/
 ├── CLAUDE.md
 ├── README.md                      # Documentación funcional de la app
 ├── PLAN_MEJORAS_ITEMS.md          # Plan por fases del sistema de ítems (I1–I6)
+├── PLAN_MEJORAS_HECHIZOS.md       # Plan por fases del sistema de hechizos (H1–H6)
+├── PLAN_MEJORAS_CAMPAÑAS.md       # Plan por fases del sistema de campañas (C1–C7)
+├── guides/                        # Guías de especificación D&D 5e (referencia de implementación)
+│   ├── dnd5e_campaigns_guide.md   #   base de las fases C1–C7
+│   ├── dnd5e_character_creation_guide.md
+│   ├── dnd5e_equipment_guide.md   #   base de las fases I1–I6
+│   └── dnd5e_spells_guide.md      #   base de las fases H1–H6
 ├── .gitignore
 ├── Dockerfile                     # ⚠️ Dockerfile en raíz (copia api/ → ./api/)
 ├── reset_admin.py                 # Utilidad: resetear password de admin (BD)
@@ -116,9 +123,14 @@ DnD/
 │   └── pages/
 │       ├── login.js
 │       ├── dashboard.js           # 5 stats de comunidad en tiempo real
-│       ├── campaigns.js           # CRUD campañas con cards animadas
+│       ├── campaigns.js           # CRUD campañas + metadatos/progresión/reglas (C1)
 │       ├── characters.js          # Ficha D&D 5e + modal 5 tabs + panel de combate calculado (~1900 líneas)
-│       ├── sessions.js            # Timeline + detalle con tabs + asistencia + botín (loot)
+│       ├── sessions.js            # Timeline + detalle + asistencia + botín + cliffhanger/recap + progresión (C4)
+│       ├── quests.js              # #/quests — Aventuras & Misiones con visibilidad DM (C2)
+│       ├── world.js               # #/world — Compendio: NPCs/localizaciones/facciones (C3)
+│       ├── encounters.js          # #/encounters — bestiario + builder con dificultad en vivo (C5)
+│       ├── combat.js              # openCombat: overlay del rastreador de combate (C6)
+│       ├── narrative.js           # #/narrative — Trama: arcos/giros + recompensas por nivel (C7)
 │       ├── inventory.js           # Modo player/treasury/catalogue por hash; slots, sintonía, tienda, cargas, packs (~1400 líneas)
 │       ├── members.js             # Grid de miembros + edición de rol
 │       └── spells.js              # Catálogo de hechizos (#/spellbook): filtros, detalle,
@@ -148,19 +160,37 @@ DnD/
 │   │   ├── clan.py                # ClanCreate, ClanUpdate, ClanOut, ClanInvitationCreate
 │   │   ├── chat.py                # ChatRoom*, ChatMessage*, DirectMessage*
 │   │   ├── event.py               # EventLogOut
-│   │   └── spell_model.py         # SpellCreate/Update/Out, CharacterSpellAdd/Update,
-│   │                              #   SpellCastRequest, RestRequest, ConcentrationSet (Fases H1/H6)
-│   ├── services/                  # Lógica de dominio pura (Fases I4–I5, H4)
+│   │   ├── spell_model.py         # SpellCreate/Update/Out, CharacterSpellAdd/Update,
+│   │   │                          #   SpellCastRequest, RestRequest, ConcentrationSet (Fases H1/H6)
+│   │   ├── adventure.py           # AdventureCreate/Update/Out (C2)
+│   │   ├── quest.py               # QuestCreate/Update/Out + QuestObjective (C2)
+│   │   ├── location.py            # LocationCreate/Update/Out (C3)
+│   │   ├── npc.py                 # NpcCreate/Update/Out (npc_class→class) (C3)
+│   │   ├── faction.py             # FactionCreate/Update/Out + ReputationSet (C3)
+│   │   ├── stat_block.py          # StatBlockCreate/Update/Out (bestiario, C5)
+│   │   ├── encounter.py           # EncounterCreate/Update + EncounterMonsterIn + DifficultyPreview (C5)
+│   │   ├── combat.py              # CombatantAdd/Update + 14 condiciones (C6)
+│   │   └── arc.py                 # StoryArc*/PlotTwist* + StoryBeat (C7)
+│   ├── services/                  # Lógica de dominio pura (Fases I4–I5, H4, C4–C7)
 │   │   ├── character_mechanics.py # compute_combat: CA efectiva, velocidad, sigilo, ataques
 │   │   ├── economy.py             # conversión de moneda (cp), peso de monedas, carga/encumbramiento
-│   │   └── spellcasting.py        # compute_spellcasting: CD/ataque, ranuras full/half/third/pact,
-│   │                              #   límites, disponibilidad (can_learn) — clase ES→canónica
+│   │   ├── spellcasting.py        # compute_spellcasting: CD/ataque, ranuras full/half/third/pact,
+│   │   │                          #   límites, disponibilidad (can_learn) — clase ES→canónica
+│   │   ├── progression.py         # XP_THRESHOLDS/BPC, level_for_xp, xp_progress (C4)
+│   │   ├── encounter_math.py      # balanceo DMG: umbrales XP, CR→XP, multiplicadores, dificultad (C5)
+│   │   └── treasure.py            # tesoro por nivel/tier + rarezas (C7)
 │   └── routers/
 │       ├── auth.py                # POST /login, /register
 │       ├── members.py             # GET/POST/PUT /members (POST admin-only)
-│       ├── campaigns.py           # CRUD /campaigns + DELETE + /treasury (currency)
+│       ├── campaigns.py           # CRUD /campaigns + DELETE + metadatos C1 + /progression (C4)
+│       ├── adventures.py          # CRUD /campaigns/{id}/adventures (C2)
+│       ├── quests.py              # CRUD /campaigns/{id}/quests (C2)
 │       ├── characters.py          # CRUD /characters + /hp /conditions /spell-slots + /combat (I4)
-│       ├── sessions.py            # CRUD /sessions + DELETE + asistencia
+│       ├── sessions.py            # CRUD /sessions + DELETE + asistencia + /recap (C4)
+│       ├── worldbuilding.py       # CRUD locations/npcs/factions + reputación, filtrado DM-only (C3)
+│       ├── encounters.py          # bestiario + encuentros + preview-difficulty (C5)
+│       ├── combat.py              # rastreador de combate: start/next-turn/combatants (C6)
+│       ├── narrative.py           # arcos/giros + treasure-guidance (C7)
 │       ├── inventory.py           # /items (catálogo completo), inventario de personaje (slots/sintonía),
 │       │                          #   tesoro de campaña, /currency + /carry, /shop/buy|sell,
 │       │                          #   /use /use-charge /recharge, /packs, /sessions/{id}/loot  (~1150 líneas)
@@ -176,15 +206,24 @@ DnD/
 │   ├── migrate.py                 # Runner de migraciones (acepta nombre por CLI)
 │   ├── seed_items.py              # Seeder idempotente del catálogo SRD (216 ítems)
 │   ├── seed_spells.py             # Seeder idempotente de hechizos SRD (319) — cachea db/data/srd_spells.json
+│   ├── seed_monsters.py           # Seeder idempotente del bestiario (22 monstruos curados, C5)
 │   ├── migrate_spells_known.py    # Migración de datos (obsoleto tras 006)
 │   ├── data/
-│   │   └── srd_spells.json        # Cache versionada de la SRD 5.1 (fuente del seed)
+│   │   ├── srd_spells.json        # Cache versionada de la SRD 5.1 (fuente del seed de hechizos)
+│   │   └── srd_monsters.json      # Bestiario curado (fuente del seed de monstruos, C5)
 │   └── migrations/
 │       ├── 001_initial_schema.sql # Schema v2.0 completo (656 líneas)
 │       ├── 003_equipment_slots.sql# Columna character_inventory.slot (Fase I3)
 │       ├── 004_spells.sql         # enum spell_school + tablas spells y character_spells (H1)
 │       ├── 005_spellcasting_state.sql # characters.concentrating_on + spells.material_item_id (H6)
-│       └── 006_drop_deprecated_spell_columns.sql # DROP spells_known/cantrips_known (H6)
+│       ├── 006_drop_deprecated_spell_columns.sql # DROP spells_known/cantrips_known (H6)
+│       ├── 007_campaign_metadata.sql  # metadatos de campaña + estados planning/on_hiatus (C1)
+│       ├── 008_adventures.sql         # tabla adventures + sessions/quests.adventure_id (C2)
+│       ├── 009_worldbuilding_fields.sql # npcs.attitude/motivation/secret/dm_only (C3)
+│       ├── 010_session_log.sql        # sessions prep_notes/cliffhanger/refs (C4)
+│       ├── 011_bestiary_encounters.sql # stat_blocks/encounters/encounter_monsters (C5)
+│       ├── 012_combat_tracker.sql     # combat_trackers/combatants (C6)
+│       └── 013_narrative_rewards.sql  # story_arcs/plot_twists (C7)
 │                                  # (no hay 002: el seed es el script standalone seed_items.py)
 │
 └── .github/
@@ -380,6 +419,12 @@ combat_trackers     (id, encounter_id→encounters UNIQUE, campaign_id→campaig
 combatants          (id, tracker_id→combat_trackers, name, combatant_type (pc|npc|monster), reference_id,
                      initiative, initiative_tiebreak (mod DES), max_hp, current_hp, temp_hp, armor_class,
                      conditions TEXT[], exhaustion 0-6, concentration, is_dead, notes)
+
+-- Capa narrativa (Fase C7 vía routers/narrative.py; recompensas en services/treasure.py)
+story_arcs          (id, campaign_id→campaigns, title, description, arc_type (main|side|character|faction),
+                     status, beats JSONB [{title,description,completed}], visible_to_players, notes, sort_order)
+plot_twists         (id, campaign_id→campaigns, arc_id→story_arcs, title, description, setup_clues TEXT[],
+                     reveal_condition, revealed, impact, dm_only)   -- jugadores solo ven revealed=TRUE
 
 items               (id, name, description, type::item_type, rarity::item_rarity, weight, value_gp,
                      is_magical, is_consumable, requires_attunement, attunement_restriction,
@@ -837,8 +882,21 @@ C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 
 ```
 Luego `git add -A; git commit -m "feat: C6 rastreador de combate (iniciativa/HP/condiciones/concentración)"; git push origin main`.
 
-### Fase C7 — Pendiente
-Ver `PLAN_MEJORAS_CAMPAÑAS.md`: recompensas avanzadas (hoard vs individual, tesoro por nivel), mapas/tokens, arcos/giros (plot twists) y endurecer la visibilidad DM/jugador de forma transversal.
+### Fase C7 — Arcos/giros, recompensas y visibilidad ✅ COMPLETADA (pendiente de desplegar)
+- [x] Migración `db/migrations/013_narrative_rewards.sql` — `story_arcs` (beats JSONB, `visible_to_players`) y `plot_twists` (`dm_only` por defecto, `revealed`).
+- [x] Modelos `arc.py` (`StoryArc*` + `StoryBeat`, `PlotTwist*`) y servicio `api/services/treasure.py` (tesoro por nivel/tier + rarezas, guía §13.3). Router `api/routers/narrative.py`: CRUD de arcos y giros + `GET /campaigns/{id}/treasure-guidance`. **Giros dm_only** (guía §7.3): jugadores solo ven `revealed=TRUE`; arcos filtran `visible_to_players` y ocultan `notes`. Registrado en `main.py`.
+- [x] Frontend `frontend/pages/narrative.js` (`#/narrative`, "🎭 Trama" en grupo **Juego**): arcos con editor de beats, giros (DM) con toggle Revelar/Ocultar, y modal de **recompensas por nivel**.
+- [x] **Endurecimiento de visibilidad (transversal):** verificado que todos los sub-recursos de campaña filtran en el backend por rol — aventuras/misiones (`visible_to_players`), NPCs (`dm_only`)/localizaciones (`is_discovered`)/campos secretos, encuentros (`visible_to_players`+`dm_notes`), combate (solo DM/admin) y giros (`revealed`). No solo se ocultan en el frontend (guía §17 regla 4).
+- [x] Verificado: `ast.parse` de modelos/servicio/router; `node --check` de `narrative.js`/`router.js`; test de `treasure` (tiers) y del filtrado de giros por rol.
+- [ ] **Diferido (fuera de alcance C7):** mapas/tokens de batalla (canvas táctico, guía §8) — mayor esfuerzo de UI; queda como iteración futura.
+
+**⚠️ PENDIENTE DE DESPLIEGUE (C7) — desde PowerShell:**
+```
+C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 013_narrative_rewards
+```
+Luego `git add -A; git commit -m "feat: C7 arcos/giros + guía de recompensas + visibilidad DM/jugador"; git push origin main`.
+
+> **Sistema de Campañas C1–C7 COMPLETO.** La app cubre: metadatos/estados/progresión de campaña, jerarquía aventura→sesión→encuentro, misiones, mundo vivo (NPCs/localizaciones/facciones), bitácora + recap, bestiario + balanceo del DMG, rastreador de combate y capa narrativa (arcos/giros) con recompensas. Todas las migraciones 007–013 y sus seeds están pendientes de ejecutar en orden desde PowerShell (ver notas de cada fase).
 
 ---
 

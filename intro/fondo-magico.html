@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DND Community Manager — Login</title>
+
+<!-- ============================================================
+     FUENTE (Cinzel para el logo y las runas). Opcional pero recomendada.
+     ============================================================ -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  /* ============================================================
+     FONDO MÁGICO  ·  copia este bloque <style> completo a tu app
+     ============================================================ */
+
+  .dnd-scene {
+    position: relative;
+    width: 100%;
+    min-height: 100vh;
+    overflow: hidden;
+    background: radial-gradient(120% 120% at 50% 38%, #f7f5ee 0%, #f1efe7 46%, #e9e5d8 100%);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 20px;
+  }
+
+  .dnd-canvas {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none; z-index: 1;
+  }
+
+  .dnd-glow {
+    position: absolute; left: 50%; top: 50%;
+    width: min(78vmin, 560px); height: min(78vmin, 560px);
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(180,146,58,0.30) 0%, rgba(180,146,58,0.10) 40%, rgba(180,146,58,0) 70%);
+    filter: blur(6px); z-index: 0;
+    animation: dnd-pulse 7s ease-in-out infinite;
+  }
+
+  .dnd-seal {
+    position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(94vmin, 720px); height: min(94vmin, 720px);
+    z-index: 0;
+    animation: dnd-sealBreath 9s ease-in-out infinite;
+    filter: drop-shadow(0 0 6px rgba(138,106,18,0.25));
+  }
+
+  .dnd-rot { transform-box: view-box; transform-origin: 300px 300px; }
+  .dnd-cw70  { animation: dnd-spinCW  70s linear infinite; }
+  .dnd-ccw96 { animation: dnd-spinCCW 96s linear infinite; }
+  .dnd-cw74  { animation: dnd-spinCW  74s linear infinite; }
+  .dnd-cw52  { animation: dnd-spinCW  52s linear infinite; }
+
+  .dnd-rune {
+    position: absolute;
+    font-family: 'Cinzel', serif;
+    color: #b8923a;
+    z-index: 1;
+    text-shadow: 0 0 12px rgba(184,146,58,0.6);
+    animation: dnd-floatRune 12s ease-in-out infinite;
+  }
+
+  @keyframes dnd-spinCW  { from { transform: rotate(0deg); }   to { transform: rotate(360deg); } }
+  @keyframes dnd-spinCCW { from { transform: rotate(0deg); }   to { transform: rotate(-360deg); } }
+  @keyframes dnd-pulse {
+    0%, 100% { opacity: 0.55; transform: translate(-50%, -50%) scale(1); }
+    50%      { opacity: 0.9;  transform: translate(-50%, -50%) scale(1.08); }
+  }
+  @keyframes dnd-sealBreath { 0%, 100% { opacity: 0.16; } 50% { opacity: 0.26; } }
+  @keyframes dnd-floatRune {
+    0%   { transform: translateY(0)     rotate(0deg); opacity: 0; }
+    12%  { opacity: var(--peak, 0.5); }
+    50%  { transform: translateY(-46px) rotate(8deg); opacity: var(--peak, 0.5); }
+    88%  { opacity: var(--peak, 0.5); }
+    100% { transform: translateY(-92px) rotate(0deg); opacity: 0; }
+  }
+  @keyframes dnd-cardIn   { from { transform: translateY(20px) scale(0.975); } to { transform: translateY(0) scale(1); } }
+  @keyframes dnd-cardFade { from { opacity: 0.55; } to { opacity: 1; } }
+
+  /* respeta usuarios con "reducir movimiento" */
+  @media (prefers-reduced-motion: reduce) {
+    .dnd-glow, .dnd-seal, .dnd-rot, .dnd-rune { animation: none !important; }
+  }
+
+  /* ============================================================
+     TARJETA DE LOGIN  ·  reemplázala por el login real de tu app.
+     Solo necesitas conservar el z-index:2 para que quede por encima.
+     ============================================================ */
+  .dnd-card {
+    position: relative; z-index: 2;
+    width: 100%; max-width: 420px;
+    background: #ffffff; border-radius: 18px;
+    padding: 44px 44px 40px;
+    box-shadow: 0 24px 60px -20px rgba(80,60,10,0.28), 0 4px 16px rgba(80,60,10,0.10);
+    opacity: 1;
+    animation: dnd-cardIn 0.9s cubic-bezier(.2,.7,.2,1), dnd-cardFade 0.7s ease-out;
+  }
+  .dnd-card .head { text-align: center; }
+  .dnd-card .logo {
+    font-family: 'Cinzel', serif; font-weight: 700; font-size: 30px; letter-spacing: 8px;
+    color: #6f5209; display: flex; align-items: center; justify-content: center; gap: 14px;
+  }
+  .dnd-card .logo span { color: #b8923a; font-size: 22px; }
+  .dnd-card .subtitle { margin-top: 8px; font-size: 15px; color: #6b6b6b; }
+  .dnd-card .glyphs   { margin-top: 6px; font-size: 14px; letter-spacing: 10px; color: #cbb98f; }
+  .dnd-card .divider  { display: flex; align-items: center; gap: 12px; margin: 26px 0 24px; color: #a89a6f; font-size: 13px; }
+  .dnd-card .divider .l { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #e2dcc7); }
+  .dnd-card .divider .r { flex: 1; height: 1px; background: linear-gradient(90deg, #e2dcc7, transparent); }
+  .dnd-card label { display: block; font-size: 13px; font-weight: 700; color: #4a4a4a; margin-bottom: 8px; }
+  .dnd-card input {
+    width: 100%; padding: 13px 14px; margin-bottom: 20px;
+    border: 1px solid #cdd6ee; border-radius: 9px; background: #e9edf9;
+    font-size: 15px; color: #2f2f2f; outline: none;
+  }
+  .dnd-card input.pw { margin-bottom: 24px; }
+  .dnd-card button {
+    width: 100%; padding: 15px; border: none; border-radius: 9px;
+    background: linear-gradient(180deg, #8a6a14, #6f5209);
+    color: #fff; font-size: 16px; font-weight: 700; letter-spacing: 0.3px; cursor: pointer;
+    box-shadow: 0 6px 16px -6px rgba(111,82,9,0.6);
+  }
+  .dnd-card button:hover { filter: brightness(1.08); }
+  .dnd-card .register { text-align: center; margin-top: 22px; font-size: 14px; color: #8a6a14; font-weight: 600; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     ESTRUCTURA. El contenedor .dnd-scene envuelve el fondo + tu login.
+     ============================================================ -->
+<div class="dnd-scene">
+
+  <!-- 1) chispas doradas (canvas) -->
+  <canvas class="dnd-canvas" id="dndCanvas"></canvas>
+
+  <!-- 2) resplandor central -->
+  <div class="dnd-glow"></div>
+
+  <!-- 3) sello del gremio: anillos + runas girando -->
+  <div class="dnd-seal">
+    <svg viewBox="0 0 600 600" width="100%" height="100%" style="overflow:visible;">
+      <defs>
+        <path id="dnd-runeRing"  d="M 300,300 m -262,0 a 262,262 0 1,1 524,0 a 262,262 0 1,1 -524,0"></path>
+        <path id="dnd-runeRing2" d="M 300,300 m -224,0 a 224,224 0 1,1 448,0 a 224,224 0 1,1 -448,0"></path>
+      </defs>
+
+      <!-- anillos externos + marcas (horario) -->
+      <g class="dnd-rot dnd-cw70" fill="none" stroke="#8a6a12" stroke-width="1.6">
+        <circle cx="300" cy="300" r="290"></circle>
+        <circle cx="300" cy="300" r="238" stroke-width="1"></circle>
+        <g stroke-width="1.4">
+          <line x1="300" y1="8" x2="300" y2="30"></line>
+          <line x1="592" y1="300" x2="570" y2="300"></line>
+          <line x1="300" y1="592" x2="300" y2="570"></line>
+          <line x1="8" y1="300" x2="30" y2="300"></line>
+          <line x1="506" y1="94" x2="491" y2="109"></line>
+          <line x1="506" y1="506" x2="491" y2="491"></line>
+          <line x1="94" y1="506" x2="109" y2="491"></line>
+          <line x1="94" y1="94" x2="109" y2="109"></line>
+        </g>
+      </g>
+
+      <!-- banda de runas externa (antihorario) -->
+      <g class="dnd-rot dnd-ccw96">
+        <circle cx="300" cy="300" r="262" fill="none" stroke="#8a6a12" stroke-width="0.8" opacity="0.7"></circle>
+        <text fill="#6f5209" font-family="'Cinzel', serif" font-size="24" letter-spacing="9" opacity="0.95">
+          <textPath href="#dnd-runeRing" startOffset="0">ᚠ ᚱ ᚦ ᚨ ᚷ ᛟ ᚹ ᚲ ᛈ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᚾ ᛁ ᛃ ᚺ ᛉ ᛇ ᚢ ᚠ ᚱ ᚦ ᚨ ᚷ ᛟ ᚹ ᚲ ᛈ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᚾ ᛁ ᛃ ᚺ ᛉ ᛇ ᚢ</textPath>
+        </text>
+      </g>
+
+      <!-- banda de runas interna (horario, sentido opuesto) -->
+      <g class="dnd-rot dnd-cw74">
+        <circle cx="300" cy="300" r="224" fill="none" stroke="#8a6a12" stroke-width="0.7" opacity="0.6"></circle>
+        <text fill="#6f5209" font-family="'Cinzel', serif" font-size="18" letter-spacing="7" opacity="0.9">
+          <textPath href="#dnd-runeRing2" startOffset="0">ᛉ ᛇ ᛃ ᛁ ᚾ ᛞ ᛜ ᛚ ᛗ ᛖ ᛒ ᛏ ᛊ ᛈ ᚲ ᚹ ᛟ ᚷ ᚨ ᚦ ᚱ ᚠ ᚢ ᚺ ᛉ ᛇ ᛃ ᛁ ᚾ ᛞ ᛜ ᛚ ᛗ ᛖ ᛒ ᛏ ᛊ ᛈ ᚲ ᚹ ᛟ ᚷ ᚨ ᚦ ᚱ ᚠ ᚢ ᚺ ᛉ ᛇ ᛃ ᛁ ᚾ ᛞ ᛜ ᛚ ᛗ ᛖ ᛒ ᛏ ᛊ ᛈ ᚲ ᚹ ᛟ ᚷ ᚨ ᚦ ᚱ ᚠ ᚢ ᚺ</textPath>
+        </text>
+      </g>
+
+      <!-- geometría interna: hexagrama (horario) -->
+      <g class="dnd-rot dnd-cw52" fill="none" stroke="#8a6a12" stroke-width="1.4">
+        <circle cx="300" cy="300" r="190"></circle>
+        <circle cx="300" cy="300" r="150" stroke-width="1"></circle>
+        <polygon points="300,110 135,395 465,395" stroke-width="1.3"></polygon>
+        <polygon points="300,490 135,205 465,205" stroke-width="1.3"></polygon>
+        <circle cx="300" cy="300" r="60" stroke-width="1"></circle>
+      </g>
+    </svg>
+  </div>
+
+  <!-- 4) runas flotantes -->
+  <span class="dnd-rune" style="left:16%; top:24%; font-size:30px; --peak:0.42; animation-duration:11s;">ᚦ</span>
+  <span class="dnd-rune" style="left:80%; top:30%; font-size:24px; --peak:0.36; animation-duration:13s; animation-delay:2s;">ᚨ</span>
+  <span class="dnd-rune" style="left:22%; top:70%; font-size:26px; --peak:0.4;  animation-duration:12s; animation-delay:4s;">ᛟ</span>
+  <span class="dnd-rune" style="left:78%; top:66%; font-size:30px; --peak:0.38; animation-duration:14s; animation-delay:1.5s;">ᚱ</span>
+  <span class="dnd-rune" style="left:12%; top:50%; font-size:22px; --peak:0.32; animation-duration:15s; animation-delay:3s;">ᛇ</span>
+  <span class="dnd-rune" style="left:88%; top:48%; font-size:26px; --peak:0.34; animation-duration:12.5s; animation-delay:5s;">ᛖ</span>
+  <span class="dnd-rune" style="left:34%; top:16%; font-size:22px; --peak:0.34; animation-duration:13.5s; animation-delay:6.5s;">ᚷ</span>
+  <span class="dnd-rune" style="left:64%; top:18%; font-size:28px; --peak:0.4;  animation-duration:11.5s; animation-delay:8s;">ᛊ</span>
+  <span class="dnd-rune" style="left:44%; top:82%; font-size:24px; --peak:0.36; animation-duration:12.8s; animation-delay:2.8s;">ᛏ</span>
+  <span class="dnd-rune" style="left:58%; top:84%; font-size:20px; --peak:0.3;  animation-duration:14.5s; animation-delay:7s;">ᛗ</span>
+  <span class="dnd-rune" style="left:6%;  top:36%; font-size:26px; --peak:0.32; animation-duration:13.2s; animation-delay:9.5s;">ᚹ</span>
+  <span class="dnd-rune" style="left:94%; top:38%; font-size:22px; --peak:0.3;  animation-duration:12.2s; animation-delay:4.5s;">ᚦ</span>
+
+  <!-- ==========================================================
+       TU LOGIN. Sustituye este bloque por el formulario real
+       de tu app (mantén una clase con position:relative; z-index:2).
+       ========================================================== -->
+  <div class="dnd-card">
+    <div class="head">
+      <div class="logo"><span>✦</span>DND<span>✦</span></div>
+      <div class="subtitle">Community Manager</div>
+      <div class="glyphs">ᚱ ᚾ ✝</div>
+    </div>
+    <div class="divider"><span class="l"></span><span>Ingresa al Gremio</span><span class="r"></span></div>
+    <label for="dndUser">Usuario o email</label>
+    <input id="dndUser" type="text" value="casaljuanc@gmail.com">
+    <label for="dndPass">Contraseña</label>
+    <input id="dndPass" class="pw" type="password" value="password12">
+    <button type="button">Entrar al Gremio</button>
+    <div class="register">¿No tienes cuenta? Registrarse</div>
+  </div>
+
+</div>
+
+<!-- ============================================================
+     CHISPAS DORADAS (canvas). Copia este <script> a tu app.
+     Busca el canvas por id="dndCanvas".
+     ============================================================ -->
+<script>
+(function () {
+  var canvas = document.getElementById('dndCanvas');
+  if (!canvas || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var ctx = canvas.getContext('2d');
+  var w = 0, h = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
+  var particles = [];
+  function rand(a, b) { return a + Math.random() * (b - a); }
+
+  function build() {
+    var count = Math.round(Math.min(180, Math.max(85, (w * h) / 11000)));
+    particles = [];
+    for (var i = 0; i < count; i++) {
+      var big = Math.random() < 0.14;
+      particles.push({
+        x: Math.random() * w, y: Math.random() * h,
+        r: big ? rand(2.6, 4.6) : rand(0.7, 2.0),
+        sy: big ? rand(4, 9) : rand(9, 22),
+        sway: rand(6, 22), swaySpeed: rand(0.2, 0.7),
+        phase: Math.random() * Math.PI * 2, tw: rand(0.5, 1.6),
+        base: big ? rand(0.10, 0.22) : rand(0.20, 0.55)
+      });
+    }
+  }
+  function resize() {
+    w = canvas.clientWidth; h = canvas.clientHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    build();
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  var last = performance.now();
+  function draw(now) {
+    var dt = Math.min(0.05, (now - last) / 1000); last = now;
+    var t = now / 1000;
+    ctx.clearRect(0, 0, w, h);
+    ctx.globalCompositeOperation = 'lighter';
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i];
+      p.y -= p.sy * dt;
+      if (p.y < -12) { p.y = h + 12; p.x = Math.random() * w; }
+      var x = p.x + Math.sin(t * p.swaySpeed + p.phase) * p.sway;
+      var op = p.base * (0.55 + 0.45 * Math.sin(t * p.tw + p.phase));
+      var g = ctx.createRadialGradient(x, p.y, 0, x, p.y, p.r * 4);
+      g.addColorStop(0, 'rgba(203,166,80,' + op + ')');
+      g.addColorStop(0.35, 'rgba(184,146,58,' + (op * 0.5) + ')');
+      g.addColorStop(1, 'rgba(184,146,58,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, p.y, p.r * 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(240,222,170,' + Math.min(1, op * 1.4) + ')';
+      ctx.beginPath(); ctx.arc(x, p.y, p.r * 0.7, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+</script>
+
+</body>
+</html>
