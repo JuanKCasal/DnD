@@ -698,6 +698,40 @@ export async function render(container) {
       body.appendChild(fg);
     }
 
+    /* Adventure select (optional) — vincula la sesión a un arco (C2) */
+    const fgAdv = fieldGroup('Aventura (opcional)');
+    const advSel = document.createElement('select');
+    advSel.name = 'adventure_id';
+    applySelectStyle(advSel);
+    fgAdv.appendChild(advSel);
+    body.appendChild(fgAdv);
+
+    async function loadAdvOptions(campaignId, selectedId) {
+      advSel.innerHTML = '';
+      const none = document.createElement('option');
+      none.value = '';
+      none.textContent = '— Ninguna —';
+      advSel.appendChild(none);
+      if (!campaignId) return;
+      try {
+        const res = await api.get(`/campaigns/${campaignId}/adventures`);
+        (res.data ?? []).forEach(a => {
+          const o = document.createElement('option');
+          o.value = a.id;
+          o.textContent = a.title;
+          if (String(selectedId) === String(a.id)) o.selected = true;
+          advSel.appendChild(o);
+        });
+      } catch (e) { /* sin aventuras o sin acceso: se deja "Ninguna" */ }
+    }
+
+    const initialCamp = isEdit ? session.campaign_id : (body.querySelector('[name="campaign_id"]')?.value || campSelect.value);
+    loadAdvOptions(initialCamp, session?.adventure_id);
+    if (!isEdit) {
+      const campSelForAdv = body.querySelector('[name="campaign_id"]');
+      campSelForAdv?.addEventListener('change', () => loadAdvOptions(campSelForAdv.value, null));
+    }
+
     /* Title */
     const fgTitle = fieldGroup('Título');
     const titleInput = input('text', 'title', 'Nombre de la sesión', session?.title || '');
@@ -788,6 +822,7 @@ export async function render(container) {
         next_session_date: nextInput.value ? new Date(nextInput.value).toISOString() : null,
         highlights,
         summary: sumTextarea.value.trim() || null,
+        adventure_id: advSel.value || null,
       };
 
       if (!isEdit) {

@@ -37,6 +37,17 @@ def _assert_valid_transition(old: str, new: str) -> None:
         )
 
 
+def _hydrate(row: dict) -> dict:
+    """La BD no tiene codec JSONB → house_rules llega como str; parsear a lista."""
+    hr = row.get("house_rules")
+    if isinstance(hr, str):
+        try:
+            row["house_rules"] = json.loads(hr)
+        except (ValueError, TypeError):
+            row["house_rules"] = []
+    return row
+
+
 @router.get("", response_model=dict)
 async def list_campaigns(
     page: int = Query(1, ge=1),
@@ -80,7 +91,7 @@ async def list_campaigns(
         """,
         *params_page,
     )
-    return list_response(records_to_list(rows), total, page, per_page)
+    return list_response([_hydrate(dict(r)) for r in rows], total, page, per_page)
 
 
 @router.post("", response_model=dict, status_code=201)
@@ -142,7 +153,7 @@ async def create_campaign(
         actor_member_id=str(current_user["id"]), is_public=True,
     )
     row = await conn.fetchrow("SELECT * FROM campaigns WHERE id = $1", campaign_id)
-    return item_response(dict(row))
+    return item_response(_hydrate(dict(row)))
 
 
 @router.get("/{campaign_id}", response_model=dict)
@@ -162,7 +173,7 @@ async def get_campaign(
     if not row:
         raise HTTPException(status_code=404, detail="Campaign not found")
 
-    data = dict(row)
+    data = _hydrate(dict(row))
     if not data["is_public"] and current_user["role"] not in ("admin", "dm"):
         is_member = await conn.fetchval(
             "SELECT 1 FROM campaign_members WHERE campaign_id = $1 AND member_id = $2",
@@ -215,7 +226,7 @@ async def update_campaign(
         *params,
     )
     row = await conn.fetchrow("SELECT * FROM campaigns WHERE id = $1", campaign_id)
-    return item_response(dict(row))
+    return item_response(_hydrate(dict(row)))
 
 
 @router.delete("/{campaign_id}", status_code=204)

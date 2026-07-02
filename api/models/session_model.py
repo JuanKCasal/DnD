@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 class SessionCreate(BaseModel):
     campaign_id: UUID
+    adventure_id: Optional[UUID] = None
     title: Optional[str] = None
     date: Optional[Date] = None
     duration_min: Optional[int] = None
@@ -17,6 +18,7 @@ class SessionCreate(BaseModel):
 
 
 class SessionUpdate(BaseModel):
+    adventure_id: Optional[UUID] = None
     title: Optional[str] = None
     date: Optional[Date] = None
     duration_min: Optional[int] = None
@@ -30,6 +32,7 @@ class SessionUpdate(BaseModel):
 class SessionOut(BaseModel):
     id: UUID
     campaign_id: UUID
+    adventure_id: Optional[UUID] = None
     session_number: int
     title: Optional[str] = None
     date: Optional[Date] = None

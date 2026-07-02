@@ -338,10 +338,19 @@ characters          (id, member_id→members, campaign_id→campaigns, name, rac
 character_currency  (character_id→characters PK, copper, silver, electrum, gold, platinum)
                      -- ⚠️ columnas reales: copper/silver/electrum/gold/platinum (NO pp/gp/ep/sp/cp)
 
-sessions            (id, campaign_id→campaigns, session_number AUTO, title, date, duration_min,
-                     summary, highlights TEXT[], xp_awarded, milestone_level, next_session_date,
-                     created_by→members)   -- milestone_level expuesto en Fase C1
+adventures          (id, campaign_id→campaigns, title, description, sort_order, source (official|homebrew),
+                     module_name, status (not_started|active|completed|abandoned), rec_level_min/max,
+                     visible_to_players, dm_notes, created_at)   -- Fase C2 (008); arco entre campaña y sesión
+sessions            (id, campaign_id→campaigns, adventure_id→adventures (C2), session_number AUTO, title,
+                     date, duration_min, summary, highlights TEXT[], xp_awarded, milestone_level,
+                     next_session_date, created_by→members)   -- milestone_level expuesto en Fase C1
 session_attendance  (session_id, member_id PK, character_id→characters, present)
+
+quests              (id, campaign_id→campaigns, adventure_id→adventures (C2), title, description,
+                     status::quest_status, quest_type (main|side|personal|faction|fetch|escort|bounty, C2),
+                     quest_giver_npc_id→npcs, reward_description, reward_xp, reward_gp, objectives JSONB
+                     [{text,completed,optional}], visible_to_players (C2), notes, completed_at)
+                     -- expuesta en Fase C2 (routers/quests.py); npcs/locations/factions siguen sin exponer
 
 items               (id, name, description, type::item_type, rarity::item_rarity, weight, value_gp,
                      is_magical, is_consumable, requires_attunement, attunement_restriction,
@@ -731,8 +740,23 @@ C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 
 ```
 Luego `git add -A; git commit -m "feat: C1 metadatos de campaña + estados + milestone_level + validación de transición"; git push origin main`.
 
-### Fases C2–C7 — Pendientes
-Ver `PLAN_MEJORAS_CAMPAÑAS.md`: C2 aventuras + misiones · C3 NPCs/localizaciones/facciones · C4 bitácora + progresión · C5 bestiario + encuentros + balanceo · C6 combat tracker · C7 recompensas/mapas/visibilidad.
+### Fase C2 — Jerarquía narrativa: Aventuras + Misiones ✅ COMPLETADA (pendiente de desplegar)
+- [x] Migración `db/migrations/008_adventures.sql` — tabla `adventures` (arco entre campaña y sesión; `status`/`source` VARCHAR validados en Pydantic, CHECK de niveles); `sessions.adventure_id`; en `quests` añade `adventure_id`, `quest_type`, `visible_to_players`.
+- [x] Modelos `adventure.py` (Create/Update/Out) y `quest.py` (Create/Update/Out + `QuestObjective`) con validadores (status/source/quest_type, niveles 1–20).
+- [x] Routers `adventures.py` y `quests.py` bajo `/api/v1/campaigns/{id}/adventures|quests` — CRUD; **crear/editar/eliminar solo DM de la campaña o admin**; filtro `visible_to_players` + strip de `dm_notes` para jugadores (guía §17 regla 4). `objectives` JSONB parseado en el router (la BD no tiene codec JSONB → llega como str; mismo patrón que `characters`/`inventory`). `completed_at` se sincroniza con `status`. Registrados en `main.py`.
+- [x] `sessions.py` + `session_model.py`: `adventure_id` en INSERT, proyección de lista y modelos.
+- [x] Frontend: nueva página `frontend/pages/quests.js` (`#/quests`) — selector de campaña, sección Aventuras (CRUD) y sección Misiones (CRUD con editor de objetivos, tipo, recompensas, visibilidad). Nav "⚔️ Aventuras & Misiones" habilitado en `router.js`. Selector de aventura añadido al modal de sesión (`sessions.js`).
+- [x] **Fix C1 relacionado:** `campaigns.house_rules` (JSONB) también se parsea ahora en el router (`_hydrate`) — sin esto, el modal de edición fallaba al hacer `.map` sobre un string.
+- [x] Verificado: `ast.parse` de modelos/routers nuevos; `node --check` de `quests.js`/`sessions.js`/`router.js`/`campaigns.js`; conteos INSERT (adventures 12/12, quests 14 params + `completed_at` literal, sessions 13/13).
+
+**⚠️ PENDIENTE DE DESPLIEGUE (C2) — desde PowerShell:**
+```
+C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 008_adventures
+```
+Luego `git add -A; git commit -m "feat: C2 aventuras/arcos + misiones (quests) con visibilidad DM/jugador"; git push origin main`.
+
+### Fases C3–C7 — Pendientes
+Ver `PLAN_MEJORAS_CAMPAÑAS.md`: C3 NPCs/localizaciones/facciones · C4 bitácora + progresión · C5 bestiario + encuentros + balanceo · C6 combat tracker · C7 recompensas/mapas/visibilidad.
 
 ---
 

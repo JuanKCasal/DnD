@@ -36,7 +36,7 @@ async def list_sessions(
     params_page = params + [limit, offset]
     rows = await conn.fetch(
         f"""
-        SELECT s.id, s.campaign_id, s.session_number, s.title, s.date,
+        SELECT s.id, s.campaign_id, s.adventure_id, s.session_number, s.title, s.date,
                s.duration_min, s.xp_awarded, s.milestone_level, s.created_by,
                s.created_at, s.next_session_date
         FROM sessions s
@@ -77,12 +77,13 @@ async def create_session(
     await conn.execute(
         """
         INSERT INTO sessions (
-            id, campaign_id, session_number, title, date, duration_min,
+            id, campaign_id, adventure_id, session_number, title, date, duration_min,
             summary, highlights, xp_awarded, milestone_level, next_session_date, created_by
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
         """,
         session_id,
         body.campaign_id,
+        body.adventure_id,
         session_number,
         body.title,
         body.date,

@@ -6,6 +6,7 @@ const routes = {
   '#/campaigns':  () => import('../pages/campaigns.js').then(m => m.render),
   '#/characters': () => import('../pages/characters.js').then(m => m.render),
   '#/sessions':   () => import('../pages/sessions.js').then(m => m.render),
+  '#/quests':     () => import('../pages/quests.js').then(m => m.render),
   '#/inventory':  () => import('../pages/inventory.js').then(m => m.render),
   '#/treasury':   () => import('../pages/inventory.js').then(m => m.render),
   '#/catalogue':  () => import('../pages/inventory.js').then(m => m.render),
@@ -44,7 +45,7 @@ const NAV_GROUPS = [
       { icon: '🗺️', label: 'Campañas',   desc: 'Gestiona tus aventuras',       route: '#/campaigns'               },
       { icon: '📜', label: 'Sesiones',    desc: 'Crónicas y asistencia',       route: '#/sessions'                },
       { icon: '💰', label: 'Tesoros',     desc: 'Items y monedas del grupo',   route: '#/treasury'                },
-      { icon: '⚔️', label: 'Misiones',   desc: 'Quests y objetivos',          route: '#/misiones',  disabled: true },
+      { icon: '⚔️', label: 'Aventuras & Misiones', desc: 'Arcos, quests y objetivos', route: '#/quests' },
     ],
   },
   {
