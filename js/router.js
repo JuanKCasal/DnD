@@ -9,6 +9,7 @@ const routes = {
   '#/quests':     () => import('../pages/quests.js').then(m => m.render),
   '#/world':      () => import('../pages/world.js').then(m => m.render),
   '#/encounters': () => import('../pages/encounters.js').then(m => m.render),
+  '#/narrative':  () => import('../pages/narrative.js').then(m => m.render),
   '#/inventory':  () => import('../pages/inventory.js').then(m => m.render),
   '#/treasury':   () => import('../pages/inventory.js').then(m => m.render),
   '#/catalogue':  () => import('../pages/inventory.js').then(m => m.render),
@@ -49,6 +50,7 @@ const NAV_GROUPS = [
       { icon: '💰', label: 'Tesoros',     desc: 'Items y monedas del grupo',   route: '#/treasury'                },
       { icon: '⚔️', label: 'Aventuras & Misiones', desc: 'Arcos, quests y objetivos', route: '#/quests' },
       { icon: '🐉', label: 'Encuentros',  desc: 'Bestiario y balanceo',    route: '#/encounters'            },
+      { icon: '🎭', label: 'Trama',       desc: 'Arcos, giros y recompensas', route: '#/narrative'          },
     ],
   },
   {
