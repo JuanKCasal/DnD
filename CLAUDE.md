@@ -941,8 +941,21 @@ C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 
 ```
 Luego `git add -A; git commit -m "feat: CM1 identidad de personaje + visibilidad de canales + clanes por personaje"; git push origin main`.
 
-### Fases CM2–CM6 — Pendientes
-Ver `PLAN_MEJORAS_COMUNIDAD.md`: CM2 chat (canales + provisión automática + entrega en vivo + susurros) · CM3 canales de sistema (Saludos/Fama) · CM4 Calendario & Eventos · CM5 Clanes como muro social · CM6 Salón de la Fama (premios + valoración de DMs).
+### Fase CM2 — Chat: canales + provisión automática + entrega en vivo + susurros ✅ COMPLETADA (pendiente de desplegar)
+- [x] Migración `db/migrations/015_community_rooms.sql` — UPSERT de salas globales: **Anuncios y Eventos** (announcements, readonly), **Saludos** (welcome, readonly), **Público** (general), **Administradores** (admin), **Salón de la Fama** (hall_of_fame, readonly). Idempotente por slug.
+- [x] **Provisión automática:** `campaigns.py` crea la sala `type='campaign'` (`camp-{slug}`) al crear campaña; `clans.py` crea la sala `type='clan'` (`clan-{slug}`) + añade al líder a `clan_characters`.
+- [x] `chat.py`: `get_messages` con `after` (ISO) para **polling incremental** + marca de lectura; `post_message` con **permisos por tipo/pertenencia** (readonly/admin/campaña/clan) e **identidad de personaje** (IC exige personaje activo, D1); `GET /chat/dm` (bandeja de susurros) + marca de leído al abrir hilo.
+- [x] Frontend `frontend/pages/chat.js` (`#/chat`, "💬 Chat" habilitado en **Comunidad**): sidebar de canales agrupados (Comunidad/Campañas/Clanes/Privados), hilo con **polling en vivo** (auto-limpieza al salir), composer con toggle **IC/OOC** y **`/roll NdM+K`** (tira local → `message_type='dice'` + `dice_result`), y **susurros** estilo @WhatsApp (bandeja + hilo + nuevo susurro).
+- [x] Verificado: `node --check` de `chat.js`/`router.js`; regiones reescritas de `chat.py` confirmadas (get_messages/post_message/list_conversations); provisión en campaigns/clans.
+
+**⚠️ PENDIENTE DE DESPLIEGUE (CM2) — desde PowerShell (tras 014):**
+```
+C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 015_community_rooms
+```
+Luego `git add -A; git commit -m "feat: CM2 chat multi-canal (identidad de personaje, provisión de salas, entrega en vivo, susurros)"; git push origin main`.
+
+### Fases CM3–CM6 — Pendientes
+Ver `PLAN_MEJORAS_COMUNIDAD.md`: CM3 canales de sistema (Saludos/Fama) · CM4 Calendario & Eventos · CM5 Clanes como muro social · CM6 Salón de la Fama (premios + valoración de DMs).
 
 ---
 

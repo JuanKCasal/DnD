@@ -74,6 +74,25 @@ async def create_clan(
         target_id=str(clan_id), target_name=body.name,
         actor_member_id=str(current_user["id"]), is_public=True,
     )
+    # Sala de chat del clan (CM2) + membresía por personaje del líder (CM1)
+    try:
+        await conn.execute(
+            """
+            INSERT INTO chat_rooms (id, name, slug, type, clan_id, description, icon, is_ic, sort_order, created_by)
+            VALUES ($1,$2,$3,'clan'::chat_room_type,$4,$5,'🛡️',FALSE,60,$6)
+            ON CONFLICT (slug) DO NOTHING
+            """,
+            uuid.uuid4(), f"Clan: {body.name}"[:100], f"clan-{body.slug}"[:100],
+            clan_id, "Sala del clan", current_user["id"],
+        )
+        acid = current_user.get("active_character_id")
+        if acid:
+            await conn.execute(
+                "INSERT INTO clan_characters (clan_id, character_id, clan_role) VALUES ($1,$2,'leader') ON CONFLICT DO NOTHING",
+                clan_id, acid,
+            )
+    except Exception:
+        pass
     row = await conn.fetchrow("SELECT * FROM clans WHERE id = $1", clan_id)
     return item_response(dict(row))
 

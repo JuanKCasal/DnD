@@ -153,6 +153,19 @@ async def create_campaign(
         target_id=str(campaign_id), target_name=body.name,
         actor_member_id=str(current_user["id"]), is_public=True,
     )
+    # Sala de chat de la campaña (CM2) — provisión automática
+    try:
+        await conn.execute(
+            """
+            INSERT INTO chat_rooms (id, name, slug, type, campaign_id, description, icon, is_ic, sort_order, created_by)
+            VALUES ($1,$2,$3,'campaign'::chat_room_type,$4,$5,'🎲',FALSE,50,$6)
+            ON CONFLICT (slug) DO NOTHING
+            """,
+            uuid.uuid4(), f"Campaña: {body.name}"[:100], f"camp-{body.slug}"[:100],
+            campaign_id, "Sala de coordinación de la campaña", current_user["id"],
+        )
+    except Exception:
+        pass
     row = await conn.fetchrow("SELECT * FROM campaigns WHERE id = $1", campaign_id)
     return item_response(_hydrate(dict(row)))
 
