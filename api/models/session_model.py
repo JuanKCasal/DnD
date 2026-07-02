@@ -15,6 +15,12 @@ class SessionCreate(BaseModel):
     xp_awarded: int = 0
     milestone_level: Optional[int] = None
     next_session_date: Optional[datetime] = None
+    # ── Bitácora (Fase C4) ──
+    prep_notes: Optional[str] = None
+    cliffhanger: Optional[str] = None
+    npcs_introduced: Optional[list[UUID]] = None
+    locations_visited: Optional[list[UUID]] = None
+    quests_advanced: Optional[list[UUID]] = None
 
 
 class SessionUpdate(BaseModel):
@@ -27,6 +33,11 @@ class SessionUpdate(BaseModel):
     xp_awarded: Optional[int] = None
     milestone_level: Optional[int] = None
     next_session_date: Optional[datetime] = None
+    prep_notes: Optional[str] = None
+    cliffhanger: Optional[str] = None
+    npcs_introduced: Optional[list[UUID]] = None
+    locations_visited: Optional[list[UUID]] = None
+    quests_advanced: Optional[list[UUID]] = None
 
 
 class SessionOut(BaseModel):
@@ -42,6 +53,11 @@ class SessionOut(BaseModel):
     xp_awarded: int
     milestone_level: Optional[int] = None
     next_session_date: Optional[datetime] = None
+    prep_notes: Optional[str] = None
+    cliffhanger: Optional[str] = None
+    npcs_introduced: Optional[list[UUID]] = None
+    locations_visited: Optional[list[UUID]] = None
+    quests_advanced: Optional[list[UUID]] = None
     created_by: UUID
     created_at: datetime
 

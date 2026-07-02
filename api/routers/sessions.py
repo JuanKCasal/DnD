@@ -78,8 +78,9 @@ async def create_session(
         """
         INSERT INTO sessions (
             id, campaign_id, adventure_id, session_number, title, date, duration_min,
-            summary, highlights, xp_awarded, milestone_level, next_session_date, created_by
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+            summary, highlights, xp_awarded, milestone_level, next_session_date,
+            prep_notes, cliffhanger, npcs_introduced, locations_visited, quests_advanced, created_by
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
         """,
         session_id,
         body.campaign_id,
@@ -93,6 +94,11 @@ async def create_session(
         body.xp_awarded,
         body.milestone_level,
         body.next_session_date,
+        body.prep_notes,
+        body.cliffhanger,
+        body.npcs_introduced or [],
+        body.locations_visited or [],
+        body.quests_advanced or [],
         current_user["id"],
     )
 
@@ -257,3 +263,45 @@ async def get_attendance(
         session_id,
     )
     return {"data": records_to_list(rows)}
+
+
+@router.get("/{session_id}/recap", response_model=dict)
+async def get_recap(
+    session_id: uuid.UUID,
+    conn: asyncpg.Connection = Depends(get_db),
+    _: dict = Depends(get_current_user),
+):
+    """Recap de la sesión ANTERIOR (guía §15.2): resumen + cliffhanger + misiones avanzadas."""
+    cur = await conn.fetchrow(
+        "SELECT campaign_id, session_number FROM sessions WHERE id = $1", session_id
+    )
+    if not cur:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    prev = await conn.fetchrow(
+        """
+        SELECT id, session_number, title, summary, cliffhanger, quests_advanced
+        FROM sessions
+        WHERE campaign_id = $1 AND session_number < $2
+        ORDER BY session_number DESC
+        LIMIT 1
+        """,
+        cur["campaign_id"], cur["session_number"],
+    )
+    if not prev:
+        return {"data": None}
+
+    quest_titles: list[str] = []
+    if prev["quests_advanced"]:
+        qrows = await conn.fetch(
+            "SELECT title FROM quests WHERE id = ANY($1::uuid[])", prev["quests_advanced"]
+        )
+        quest_titles = [r["title"] for r in qrows]
+
+    return {"data": {
+        "session_number": prev["session_number"],
+        "title": prev["title"],
+        "summary": prev["summary"],
+        "cliffhanger": prev["cliffhanger"],
+        "quests_advanced": quest_titles,
+    }}

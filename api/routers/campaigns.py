@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from api.dependencies import get_current_user, get_db
 from api.db.helpers import item_response, list_response, log_event, paginate, records_to_list
 from api.models.campaign import CampaignCreate, CampaignUpdate
+from api.services import progression
 
 router = APIRouter(prefix="/api/v1/campaigns", tags=["campaigns"])
 
@@ -293,3 +294,43 @@ async def list_campaign_members(
         campaign_id,
     )
     return {"data": records_to_list(rows)}
+
+
+@router.get("/{campaign_id}/progression", response_model=dict)
+async def get_progression(
+    campaign_id: uuid.UUID,
+    conn: asyncpg.Connection = Depends(get_db),
+    _: dict = Depends(get_current_user),
+):
+    """Estado de progresión del grupo (Fase C4). XP acumulado vs. tabla D&D 5e (guía §14)."""
+    row = await conn.fetchrow(
+        "SELECT leveling_method, start_level, current_level, target_end_level FROM campaigns WHERE id = $1",
+        campaign_id,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    total_xp = int(await conn.fetchval(
+        "SELECT COALESCE(SUM(xp_awarded), 0) FROM sessions WHERE campaign_id = $1", campaign_id
+    ) or 0)
+    method = row["leveling_method"] or "xp"
+    current_level = row["current_level"] or 1
+
+    data = {
+        "leveling_method": method,
+        "start_level": row["start_level"],
+        "current_level": current_level,
+        "target_end_level": row["target_end_level"],
+        "total_xp": total_xp,
+        "proficiency_bonus": progression.proficiency_for_level(current_level),
+    }
+    if method == "xp":
+        prog = progression.xp_progress(total_xp)
+        data.update({
+            "suggested_level": progression.level_for_xp(total_xp),
+            "next_level": prog["next_level"],
+            "xp_into_level": prog["xp_into_level"],
+            "xp_needed_for_next": prog["xp_needed_for_next"],
+            "pct_to_next": prog["pct_to_next"],
+        })
+    return item_response(data)

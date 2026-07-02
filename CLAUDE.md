@@ -343,7 +343,9 @@ adventures          (id, campaign_id→campaigns, title, description, sort_order
                      visible_to_players, dm_notes, created_at)   -- Fase C2 (008); arco entre campaña y sesión
 sessions            (id, campaign_id→campaigns, adventure_id→adventures (C2), session_number AUTO, title,
                      date, duration_min, summary, highlights TEXT[], xp_awarded, milestone_level,
-                     next_session_date, created_by→members)   -- milestone_level expuesto en Fase C1
+                     next_session_date, created_by→members,
+                     prep_notes, cliffhanger, npcs_introduced/locations_visited/quests_advanced UUID[] (C4))
+                     -- milestone_level expuesto en C1; bitácora (prep/cliffhanger/refs) en C4
 session_attendance  (session_id, member_id PK, character_id→characters, present)
 
 quests              (id, campaign_id→campaigns, adventure_id→adventures (C2), title, description,
@@ -779,8 +781,21 @@ C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 
 ```
 Luego `git add -A; git commit -m "feat: C3 mundo vivo (NPCs/localizaciones/facciones) con visibilidad DM/jugador"; git push origin main`.
 
-### Fases C4–C7 — Pendientes
-Ver `PLAN_MEJORAS_CAMPAÑAS.md`: C4 bitácora + progresión · C5 bestiario + encuentros + balanceo · C6 combat tracker · C7 recompensas/mapas/visibilidad.
+### Fase C4 — Bitácora de sesión enriquecida + progresión ✅ COMPLETADA (pendiente de desplegar)
+- [x] Migración `db/migrations/010_session_log.sql` — `sessions`: `prep_notes`, `cliffhanger`, y arrays `npcs_introduced`/`locations_visited`/`quests_advanced` (UUID[]).
+- [x] `session_model.py`: `Session*` exponen los nuevos campos. `sessions.py`: INSERT ampliado (18 cols) + endpoint `GET /sessions/{id}/recap` (resumen + cliffhanger + misiones de la sesión anterior, guía §15.2).
+- [x] Servicio `api/services/progression.py` — `XP_THRESHOLDS`/BPC (guía §14.1, constantes de sistema); `level_for_xp`, `xp_progress`, `proficiency_for_level`. Endpoint `GET /campaigns/{id}/progression` en `campaigns.py`: suma XP de sesiones, nivel sugerido vs. `current_level`, progreso al siguiente nivel; soporta método `xp` y `milestone`.
+- [x] Frontend `sessions.js`: campos **Cliffhanger** y **Notas de preparación (DM)** en el modal; el detalle muestra el cliffhanger y un **recap de la sesión anterior**; panel de **progresión** (nivel, XP, barra al siguiente nivel, BPC, sugerencia de subida) al filtrar por campaña.
+- [x] Verificado: `ast.parse` (progression/modelos + copia temporal de los endpoints), test de `progression` (umbrales/BPC/progreso), `node --check` de `sessions.js`, conteo INSERT 18/18.
+
+**⚠️ PENDIENTE DE DESPLIEGUE (C4) — desde PowerShell:**
+```
+C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 010_session_log
+```
+Luego `git add -A; git commit -m "feat: C4 bitácora de sesión (prep/cliffhanger/recap) + progresión XP/hitos"; git push origin main`.
+
+### Fases C5–C7 — Pendientes
+Ver `PLAN_MEJORAS_CAMPAÑAS.md`: C5 bestiario + encuentros + balanceo · C6 combat tracker · C7 recompensas/mapas/visibilidad.
 
 ---
 
