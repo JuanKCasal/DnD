@@ -647,7 +647,14 @@ git push origin main
 
 **Mapa de clase ES→canónica** (en `class_key`): mago→wizard, clérigo→cleric, druida→druid, paladín→paladin, explorador→ranger, bardo→bard, hechicero→sorcerer, brujo→warlock; Guerrero/Pícaro solo lanzan si su subclase es Caballero Arcano / Pícaro Arcano.
 
-### Fase H5 — Equipar/preparar hechizos en la ficha (pendiente)
+### Fase H5 — Equipar/preparar hechizos en la ficha ✅ COMPLETADA
+- [x] **Backend** (`spells.py`): repertorio del personaje — `GET/POST/PUT/DELETE /api/v1/characters/{id}/spells`. POST valida disponibilidad (`can_learn`) + límites (trucos/conocidos); PUT `is_prepared` valida límite de preparados (modelo preparado, nivel ≥1); autorización dueño/DM/admin; `log_event`. Modelos `CharacterSpellAdd/Update`.
+- [x] **Frontend** (`characters.js`, pestaña Hechizos reescrita, lazy-load): cabecera con característica, CD, ataque y nivel máx; contadores Trucos/Preparados/Conocidos; panel de ranuras (o Pact Magic); repertorio agrupado por nivel con detalle expandible (tiempo/alcance/duración/material/descripción/upcasting), toggle "Preparado" (modelo preparado) y quitar.
+- [x] **Modal "Añadir hechizo"**: busca en el catálogo filtrado por clase (`class=sc.class_key`) y nivel ≤ `max_spell_level` (+ trucos); POST al repertorio con mensajes de límite desde el backend.
+- [x] Verificado: `node --check` en `characters.js`; contrato endpoints↔frontend alineado.
+
+**Nota:** `characters.spell_slots` sigue guardando el estado `used`; el endpoint `/spellcasting` fusiona totales calculados con ese `used`. La columna `characters.spells_known` (JSONB) queda deprecada (se elimina en H6).
+
 ### Fase H6 — Refinamientos mecánicos + limpieza (pendiente)
 
 ---
