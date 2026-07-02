@@ -365,6 +365,16 @@ npcs                (id, campaign_id→campaigns, name, race, class (→npc_clas
                      faction_id→factions, alive, motivation (C3), secret (C3), notes, dm_only (C3))
                      -- dm_only/secret/motivation/notes/stat_block se ocultan a jugadores en el backend
 
+-- Bestiario y encuentros (Fase C5 vía routers/encounters.py; balanceo en services/encounter_math.py)
+stat_blocks         (id, campaign_id→campaigns NULL=SRD global, name, size, creature_type, alignment,
+                     armor_class, hit_points, hit_dice, speed/abilities/senses/damage_tags JSONB,
+                     challenge_rating NUMERIC(4,3), xp_value, proficiency_bonus,
+                     traits/actions/legendary_actions/reactions JSONB, source, is_homebrew, dnd5eapi_index UNIQUE)
+encounters          (id, campaign_id→campaigns, session_id→sessions, location_id→locations, name,
+                     encounter_type, description, difficulty (derivada), party_size, party_level,
+                     terrain_features, status, dm_notes, visible_to_players)
+encounter_monsters  (id, encounter_id→encounters, stat_block_id→stat_blocks, name_override, quantity, xp_each)
+
 items               (id, name, description, type::item_type, rarity::item_rarity, weight, value_gp,
                      is_magical, is_consumable, requires_attunement, attunement_restriction,
                      damage_dice, damage_type, ac_base, source_book, source_page)
@@ -794,8 +804,23 @@ C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 
 ```
 Luego `git add -A; git commit -m "feat: C4 bitácora de sesión (prep/cliffhanger/recap) + progresión XP/hitos"; git push origin main`.
 
-### Fases C5–C7 — Pendientes
-Ver `PLAN_MEJORAS_CAMPAÑAS.md`: C5 bestiario + encuentros + balanceo · C6 combat tracker · C7 recompensas/mapas/visibilidad.
+### Fase C5 — Bestiario, Encuentros y Calculadora de dificultad ✅ COMPLETADA (pendiente de desplegar)
+- [x] Servicio `api/services/encounter_math.py` — constantes del DMG (guía §12): umbrales de XP por nivel, `CR_XP`, multiplicadores por nº de monstruos, ajuste por tamaño de grupo, presupuesto diario. `calculate_difficulty(monsters, levels)` reproduce el ejemplo §12.6 (4 PJ N3 + 6 goblins → 600 ajustado = Media). **El XP de recompensa usa el XP base, no el ajustado** (guía §13.1, §17.9).
+- [x] Migración `db/migrations/011_bestiary_encounters.sql` — `stat_blocks` (bestiario: SRD global `campaign_id NULL` + homebrew; JSONB para speed/abilities/traits/actions; `challenge_rating NUMERIC(4,3)`, `xp_value`, `dnd5eapi_index UNIQUE`), `encounters`, `encounter_monsters` (con `xp_each` snapshot).
+- [x] Modelos `stat_block.py`/`encounter.py` (+ `DifficultyPreview`) con validadores. Router `api/routers/encounters.py`: bestiario CRUD (globales no editables), encuentros CRUD (recalcula y persiste `difficulty`), `POST /campaigns/{id}/encounters/preview-difficulty`. Permisos DM/admin; filtro `visible_to_players`. Registrado en `main.py`.
+- [x] Seed `db/seed_monsters.py` + `db/data/srd_monsters.json` — **22 monstruos icónicos SRD** curados (CR 0–3) con CR/XP correctos, idempotente (`ON CONFLICT (dnd5eapi_index)`), `--dry-run`. (Curado offline; no requiere red, a diferencia de spells/items.)
+- [x] Frontend `frontend/pages/encounters.js` (`#/encounters`, "🐉 Encuentros" en grupo **Juego**): pestañas **Encuentros** (builder con selector del bestiario, cantidades y **dificultad en vivo** vía preview + avisos de letal/action-economy) y **Bestiario** (lista global+homebrew con CRUD homebrew; CR→XP automático).
+- [x] Verificado: `ast.parse` de servicio/modelos/router/seed; test de `encounter_math` (§12.6 + ajustes por tamaño de grupo + CR→XP); `seed_monsters.py --dry-run` (22 monstruos); `node --check` de `encounters.js`/`router.js`.
+
+**⚠️ PENDIENTE DE DESPLIEGUE (C5) — desde PowerShell:**
+```
+C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 011_bestiary_encounters
+C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/seed_monsters.py
+```
+Luego `git add -A; git commit -m "feat: C5 bestiario + encuentros + calculadora de dificultad DMG"; git push origin main`.
+
+### Fases C6–C7 — Pendientes
+Ver `PLAN_MEJORAS_CAMPAÑAS.md`: C6 combat tracker (initiative/condiciones) · C7 recompensas avanzadas/mapas/visibilidad.
 
 ---
 
