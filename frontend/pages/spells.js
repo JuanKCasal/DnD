@@ -280,7 +280,12 @@ export async function render(container) {
   }
 
   /* ── Modal de detalle (toda la información de uso) ── */
-  function openDetailModal(sp) {
+  async function openDetailModal(sp) {
+    // El listado no trae descripción/upcasting/material: pedir el hechizo completo
+    if (sp.description === undefined) {
+      try { sp = (await api.get(`/spells/${sp.id}`)).data; }
+      catch (e) { toast.error(e.message); return; }
+    }
     const sc = SCHOOLS[sp.school] || { label: sp.school, icon: '✨', color: 'var(--gold)' };
     const overlay = buildOverlay();
     const m = buildModal(`${sc.icon} ${sp.name}`);
@@ -383,8 +388,13 @@ export async function render(container) {
   }
 
   /* ── Modal crear/editar (admin) ── */
-  function openSpellModal(mode, sp) {
+  async function openSpellModal(mode, sp) {
     const isEdit = mode === 'edit';
+    // Al editar, cargar el hechizo completo (el listado no trae descripción/material)
+    if (isEdit && sp && sp.description === undefined) {
+      try { sp = (await api.get(`/spells/${sp.id}`)).data; }
+      catch (e) { toast.error(e.message); return; }
+    }
     const overlay = buildOverlay();
     const m = buildModal(isEdit ? `Editar «${sp.name}»` : 'Nuevo hechizo');
     m.style.maxWidth = '560px';
