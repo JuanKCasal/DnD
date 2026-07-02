@@ -43,7 +43,7 @@ const NAV_GROUPS = [
     items: [
       { icon: '👤', label: 'Perfil',      desc: 'Tu cuenta y preferencias', route: '#/perfil',    disabled: true },
       { icon: '🧙', label: 'Personajes',        desc: 'Fichas y stats',                route: '#/characters'  },
-      { icon: '🎒', label: 'Inventario del Jugador', desc: 'Tu equipamiento entre personajes', route: '#/inventory' },
+      { icon: '🎒', label: 'Inventario', desc: 'Tu equipamiento entre personajes', route: '#/inventory' },
     ],
   },
   {
@@ -74,7 +74,7 @@ const NAV_GROUPS = [
     label: 'Configuración',
     items: [
       { icon: '👥', label: 'Miembros',   desc: 'Jugadores y roles',                route: '#/members'              },
-      { icon: '📦', label: 'Catálogo',   desc: 'Items disponibles en la comunidad', route: '#/catalogue'            },
+      { icon: '📦', label: 'Catálogo de Items',   desc: 'Items disponibles en la comunidad', route: '#/catalogue'            },
       { icon: '📖', label: 'Catálogo de Hechizos', desc: 'Conjuros de la comunidad', route: '#/spellbook'           },
       { icon: '📋', label: 'Event Log',  desc: 'Historial de eventos',             route: '#/eventlog', disabled: true },
     ],
