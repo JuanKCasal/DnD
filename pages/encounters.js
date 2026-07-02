@@ -1,6 +1,7 @@
 import { api } from '../js/api.js';
 import { toast } from '../js/components/toast.js';
 import { auth } from '../js/auth.js';
+import { openCombat } from './combat.js';
 
 /* ─── CONFIG ─────────────────────────────────────────────────────── */
 const SIZES = [
@@ -126,7 +127,12 @@ export async function render(container) {
       <div style="font-size:11px;color:var(--ink-faint);margin-top:2px;">${e.party_size} PJ · nivel ${e.party_level} · ${esc(e.status)}${e.visible_to_players ? '' : ' · 🔒 DM'}</div>
       ${mons ? `<div style="font-size:13px;color:var(--ink-muted);margin-top:8px;">${mons}</div>` : '<div style="font-size:12px;color:var(--ink-faint);margin-top:8px;">Sin monstruos</div>'}
       ${e.description ? `<p style="font-size:13px;color:var(--ink-muted);line-height:1.5;margin:8px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(e.description)}</p>` : ''}`;
-    if (canManage) card.appendChild(cardActions(() => openEncounterModal(e), () => del(`encounters/${e.id}`, `encuentro "${e.name}"`)));
+    if (canManage) {
+      const actions = cardActions(() => openEncounterModal(e), () => del(`encounters/${e.id}`, `encuentro "${e.name}"`));
+      const fight = miniBtn('⚔️ Combatir', 'var(--gold)', () => openCombat(currentCampaign, e));
+      actions.insertBefore(fight, actions.firstChild);
+      card.appendChild(actions);
+    }
     return card;
   }
 
