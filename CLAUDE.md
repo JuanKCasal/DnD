@@ -375,6 +375,12 @@ encounters          (id, campaign_id→campaigns, session_id→sessions, locatio
                      terrain_features, status, dm_notes, visible_to_players)
 encounter_monsters  (id, encounter_id→encounters, stat_block_id→stat_blocks, name_override, quantity, xp_each)
 
+-- Rastreador de combate (Fase C6 vía routers/combat.py)
+combat_trackers     (id, encounter_id→encounters UNIQUE, campaign_id→campaigns, round, current_turn_index, active)
+combatants          (id, tracker_id→combat_trackers, name, combatant_type (pc|npc|monster), reference_id,
+                     initiative, initiative_tiebreak (mod DES), max_hp, current_hp, temp_hp, armor_class,
+                     conditions TEXT[], exhaustion 0-6, concentration, is_dead, notes)
+
 items               (id, name, description, type::item_type, rarity::item_rarity, weight, value_gp,
                      is_magical, is_consumable, requires_attunement, attunement_restriction,
                      damage_dice, damage_type, ac_base, source_book, source_page)
@@ -819,8 +825,20 @@ C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/seed_monste
 ```
 Luego `git add -A; git commit -m "feat: C5 bestiario + encuentros + calculadora de dificultad DMG"; git push origin main`.
 
-### Fases C6–C7 — Pendientes
-Ver `PLAN_MEJORAS_CAMPAÑAS.md`: C6 combat tracker (initiative/condiciones) · C7 recompensas avanzadas/mapas/visibilidad.
+### Fase C6 — Rastreador de combate en vivo ✅ COMPLETADA (pendiente de desplegar)
+- [x] Migración `db/migrations/012_combat_tracker.sql` — `combat_trackers` (uno por encuentro, `round`/`current_turn_index`/`active`) y `combatants` (iniciativa + desempate por mod DES, HP/temp/CA, `conditions TEXT[]`, `exhaustion`, `concentration`, `is_dead`).
+- [x] Modelo `combat.py` (`CombatantAdd`/`CombatantUpdate`) con validación de las 14 condiciones (guía §10.4) y `exhaustion` 0–6 (§10.5). Router `api/routers/combat.py`: `start` (auto-puebla monstruos del encuentro con HP propio + PJs de la campaña, **iniciativa tirada 1d20+DES**), `get`, `next-turn` (avance con salto de ronda), `add/update/delete` combatiente, `end`. **HP no negativo** (§17.6), una entrada por combatiente (§17.7). Permisos DM/admin. Registrado en `main.py`.
+- [x] Frontend `frontend/pages/combat.js` (`openCombat`, overlay): lista ordenada por iniciativa con **turno activo resaltado**, contador de ronda, daño/curación (clamp), chips de condiciones (añadir/quitar), agotamiento, concentración y "Siguiente turno". Botón "⚔️ Combatir" en cada encuentro de `encounters.js`.
+- [x] Verificado: `ast.parse` de modelo/router; `node --check` de `combat.js`/`encounters.js`; test de `ability_mod` y del avance de turno/ronda con wrap.
+
+**⚠️ PENDIENTE DE DESPLIEGUE (C6) — desde PowerShell:**
+```
+C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 012_combat_tracker
+```
+Luego `git add -A; git commit -m "feat: C6 rastreador de combate (iniciativa/HP/condiciones/concentración)"; git push origin main`.
+
+### Fase C7 — Pendiente
+Ver `PLAN_MEJORAS_CAMPAÑAS.md`: recompensas avanzadas (hoard vs individual, tesoro por nivel), mapas/tokens, arcos/giros (plot twists) y endurecer la visibilidad DM/jugador de forma transversal.
 
 ---
 

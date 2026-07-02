@@ -9,7 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from api.config import get_settings
 from api.db.connection import close_pool, get_pool, init_pool
 from api.db.kafka import close_producer, get_producer, init_producer
-from api.routers import adventures, auth, campaigns, characters, chat, clans, encounters, events, inventory, members, quests, ranks, sessions, spells, worldbuilding
+from api.routers import adventures, auth, campaigns, characters, chat, clans, combat, encounters, events, inventory, members, quests, ranks, sessions, spells, worldbuilding
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -65,6 +65,7 @@ app.include_router(adventures.router)
 app.include_router(quests.router)
 app.include_router(worldbuilding.router)
 app.include_router(encounters.router)
+app.include_router(combat.router)
 app.include_router(characters.router)
 app.include_router(sessions.router)
 app.include_router(inventory.router)
