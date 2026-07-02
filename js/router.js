@@ -51,15 +51,7 @@ const NAV_GROUPS = [
       { icon: '⚔️', label: 'Aventuras & Misiones', desc: 'Arcos, quests y objetivos', route: '#/quests' },
       { icon: '🐉', label: 'Encuentros',  desc: 'Bestiario y balanceo',    route: '#/encounters'            },
       { icon: '🎭', label: 'Trama',       desc: 'Arcos, giros y recompensas', route: '#/narrative'          },
-    ],
-  },
-  {
-    type: 'dropdown',
-    label: 'Mundo',
-    items: [
-      { icon: '🌍', label: 'Compendio',         desc: 'NPCs, lugares y facciones', route: '#/world'                },
-      { icon: '🛡️', label: 'Clanes',            desc: 'Gremios y facciones',   route: '#/clanes',    disabled: true },
-      { icon: '🏆', label: 'Salón de la Fama',  desc: 'Los mejores aventureros', route: '#/fama',     disabled: true },
+      { icon: '🌍', label: 'Compendio',   desc: 'NPCs, lugares y facciones', route: '#/world'               },
     ],
   },
   {
@@ -68,6 +60,8 @@ const NAV_GROUPS = [
     items: [
       { icon: '💬', label: 'Chat',                  desc: 'Mensajería en tiempo real', route: '#/chat',       disabled: true },
       { icon: '📅', label: 'Calendario & Eventos',  desc: 'Próximas sesiones',         route: '#/calendario', disabled: true },
+      { icon: '🛡️', label: 'Clanes',            desc: 'Gremios y facciones',     route: '#/clanes',     disabled: true },
+      { icon: '🏆', label: 'Salón de la Fama',  desc: 'Los mejores aventureros', route: '#/fama',       disabled: true },
     ],
   },
   {
