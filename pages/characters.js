@@ -904,44 +904,16 @@ export async function render(container) {
       p2.appendChild(condWrap);
     }
 
-    /* ─── TAB 3: HECHIZOS ─── */
+    /* ─── TAB 3: HECHIZOS (lazy-load, Fase H5) ─── */
     const p3 = panels['hechizos'];
     p3.style.cssText = 'padding:24px 32px;display:none;';
-    p3.appendChild(sectionTitle('Espacios de Conjuro'));
-
-    const slotKeys = Object.keys(spell_slots);
-    if (!slotKeys.length) {
-      const noSpells = document.createElement('div');
-      noSpells.style.cssText = 'text-align:center;padding:48px 20px;color:var(--ink-muted);';
-      noSpells.innerHTML = '<div style="font-size:36px;margin-bottom:12px;">📿</div><div style="font-size:13px;">Sin espacios de conjuro registrados</div>';
-      p3.appendChild(noSpells);
-    } else {
-      const slotGrid = document.createElement('div');
-      slotGrid.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:12px;';
-      for (let n = 1; n <= 9; n++) {
-        const sd = spell_slots[n] ?? spell_slots[String(n)];
-        if (!sd) continue;
-        const total = sd.total ?? 0;
-        const avail = Math.max(0, total - (sd.used ?? 0));
-        const card  = document.createElement('div');
-        card.style.cssText = 'background:var(--stone-light);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;';
-        const lvlLbl = document.createElement('div');
-        lvlLbl.style.cssText = 'font-size:9px;font-weight:700;color:var(--gold-dim);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;';
-        lvlLbl.textContent = 'Nivel ' + n;
-        const bubbles = document.createElement('div');
-        bubbles.style.cssText = 'display:flex;justify-content:center;flex-wrap:wrap;gap:5px;margin-bottom:8px;';
-        for (let i = 0; i < total; i++) {
-          const b = document.createElement('div');
-          b.style.cssText = 'width:14px;height:14px;border-radius:50%;border:1.5px solid ' + (i<avail?'var(--gold)':'var(--border)') + ';background:' + (i<avail?'var(--gold)':'transparent') + ';';
-          bubbles.appendChild(b);
-        }
-        const cnt = document.createElement('div');
-        cnt.style.cssText = 'font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--gold);';
-        cnt.textContent = avail + ' / ' + total;
-        card.appendChild(lvlLbl); card.appendChild(bubbles); card.appendChild(cnt);
-        slotGrid.appendChild(card);
-      }
-      p3.appendChild(slotGrid);
+    p3.innerHTML = '<div style="text-align:center;padding:40px;color:var(--ink-muted);font-size:13px;">Cargando hechizos…</div>';
+    {
+      let spLoaded = false;
+      const spBtn = tabBar.querySelector('[data-tab="hechizos"]');
+      if (spBtn) spBtn.addEventListener('click', () => {
+        if (!spLoaded) { spLoaded = true; renderShHechizos(p3); }
+      });
     }
 
     /* ─── TAB 4: RASGOS ─── */
@@ -1264,6 +1236,360 @@ export async function render(container) {
       overlay.appendChild(modal);
       document.body.appendChild(overlay);
       overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+      document.addEventListener('keydown', function esc(e) {
+        if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
+      });
+      setTimeout(() => searchInput.focus(), 100);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       TAB HECHIZOS — repertorio + parámetros de conjuración (Fase H5)
+    ═══════════════════════════════════════════════════════════════ */
+    const SP_SCHOOLS = {
+      abjuration: ['Abjuración', '#4a9eff'], conjuration: ['Conjuración', '#f59e0b'],
+      divination: ['Adivinación', '#14b8a6'], enchantment: ['Encantamiento', '#ec4899'],
+      evocation: ['Evocación', '#9B2335'], illusion: ['Ilusión', '#a855f7'],
+      necromancy: ['Nigromancia', '#4b5563'], transmutation: ['Transmutación', '#22c55e'],
+    };
+    const SP_ABIL = { STR: 'Fuerza', DEX: 'Destreza', CON: 'Constitución', INT: 'Inteligencia', WIS: 'Sabiduría', CHA: 'Carisma' };
+    const spFmt = (n) => (n >= 0 ? '+' : '') + n;
+    const spLvlName = (n) => (n === 0 ? 'Trucos' : 'Nivel ' + n);
+
+    function spBadge(text, color) {
+      const el = document.createElement('span');
+      el.style.cssText = `padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;color:${color};background:${color}1e;border:1px solid ${color}33;`;
+      el.textContent = text;
+      return el;
+    }
+
+    async function renderShHechizos(el) {
+      const render = async () => {
+        el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--ink-muted);font-size:13px;">Cargando hechizos…</div>';
+        let sc, repertoire;
+        try {
+          const [scRes, repRes] = await Promise.all([
+            api.get(`/characters/${c.id}/spellcasting`),
+            api.get(`/characters/${c.id}/spells`),
+          ]);
+          sc = scRes.data; repertoire = repRes.data ?? [];
+        } catch (e) {
+          el.innerHTML = `<div style="color:var(--crimson);padding:20px;">Error: ${e.message}</div>`;
+          return;
+        }
+        el.innerHTML = '';
+
+        if (!sc || !sc.is_caster) {
+          el.innerHTML = '<div style="text-align:center;padding:48px 20px;color:var(--ink-muted);"><div style="font-size:36px;margin-bottom:12px;">📿</div><div style="font-size:13px;">Esta clase no lanza hechizos</div></div>';
+          return;
+        }
+
+        /* Parámetros de conjuración */
+        const stats = document.createElement('div');
+        stats.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:20px;';
+        const statCard = (label, val) => {
+          const card = document.createElement('div');
+          card.style.cssText = 'background:var(--stone-light);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;';
+          card.innerHTML = `<div style="font-size:9px;font-weight:700;color:var(--gold-dim);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">${label}</div>
+            <div style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:var(--gold);">${val}</div>`;
+          return card;
+        };
+        stats.appendChild(statCard('Característica', sc.spellcasting_ability || '—'));
+        stats.appendChild(statCard('CD salvación', sc.spell_save_dc ?? '—'));
+        stats.appendChild(statCard('Ataque', sc.spell_attack_bonus != null ? spFmt(sc.spell_attack_bonus) : '—'));
+        stats.appendChild(statCard('Nivel máx.', sc.max_spell_level ?? '—'));
+        el.appendChild(stats);
+
+        /* Contadores de límite */
+        const cantripsKnown = repertoire.filter((s) => s.level === 0).length;
+        const leveled = repertoire.filter((s) => s.level > 0);
+        const counters = document.createElement('div');
+        counters.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;';
+        counters.appendChild(spBadge(`✨ Trucos ${cantripsKnown}/${sc.max_cantrips ?? '—'}`, 'var(--gold)'));
+        if (sc.preparation_model === 'prepared') {
+          const prepared = leveled.filter((s) => s.is_prepared).length;
+          counters.appendChild(spBadge(`📖 Preparados ${prepared}/${sc.max_spells_prepared ?? '—'}`, '#4a9eff'));
+        } else if (sc.max_spells_known != null) {
+          counters.appendChild(spBadge(`📚 Conocidos ${leveled.length}/${sc.max_spells_known}`, '#4a9eff'));
+        }
+        el.appendChild(counters);
+
+        /* Espacios de conjuro */
+        el.appendChild(sectionTitle('Espacios de Conjuro'));
+        if (sc.caster_type === 'pact' && sc.pact_magic) {
+          const p = document.createElement('div');
+          p.style.cssText = 'background:var(--stone-light);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;margin-bottom:20px;';
+          p.innerHTML = `<div style="font-size:9px;font-weight:700;color:var(--gold-dim);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Pacto (nivel ${sc.pact_magic.slot_level})</div>
+            <div style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:var(--gold);">${sc.pact_magic.slots} ranuras</div>
+            <div style="font-size:10px;color:var(--ink-muted);margin-top:4px;">Se recuperan en descanso corto</div>`;
+          el.appendChild(p);
+        } else {
+          const slots = sc.spell_slots || {};
+          const keys = Object.keys(slots);
+          if (!keys.length) {
+            const none = document.createElement('div');
+            none.style.cssText = 'color:var(--ink-muted);font-size:12px;margin-bottom:20px;';
+            none.textContent = 'Sin espacios de conjuro a este nivel.';
+            el.appendChild(none);
+          } else {
+            const grid = document.createElement('div');
+            grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:12px;margin-bottom:20px;';
+            for (let n = 1; n <= 9; n++) {
+              const sd = slots[n] ?? slots[String(n)];
+              if (!sd) continue;
+              const total = sd.total ?? 0;
+              const avail = Math.max(0, total - (sd.used ?? 0));
+              const card = document.createElement('div');
+              card.style.cssText = 'background:var(--stone-light);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;';
+              const bubbles = [];
+              for (let i = 0; i < total; i++) {
+                bubbles.push(`<div style="width:12px;height:12px;border-radius:50%;border:1.5px solid ${i < avail ? 'var(--gold)' : 'var(--border)'};background:${i < avail ? 'var(--gold)' : 'transparent'};"></div>`);
+              }
+              card.innerHTML = `<div style="font-size:9px;font-weight:700;color:var(--gold-dim);text-transform:uppercase;margin-bottom:8px;">Nivel ${n}</div>
+                <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:4px;margin-bottom:8px;">${bubbles.join('')}</div>
+                <div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--gold);">${avail}/${total}</div>`;
+              grid.appendChild(card);
+            }
+            el.appendChild(grid);
+          }
+        }
+
+        /* Encabezado del repertorio + botón añadir */
+        const repHead = document.createElement('div');
+        repHead.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin:8px 0 12px;';
+        const repTitle = sectionTitle('Repertorio');
+        repTitle.style.margin = '0';
+        repHead.appendChild(repTitle);
+        if (canEdit) {
+          const addBtn = document.createElement('button');
+          addBtn.className = 'btn btn-primary';
+          addBtn.style.cssText = 'font-size:12px;padding:6px 12px;';
+          addBtn.textContent = '+ Añadir hechizo';
+          addBtn.addEventListener('click', () => openSpellAddModal(sc, render));
+          repHead.appendChild(addBtn);
+        }
+        el.appendChild(repHead);
+
+        if (!repertoire.length) {
+          const empty = document.createElement('div');
+          empty.style.cssText = 'text-align:center;padding:32px;color:var(--ink-muted);font-size:13px;';
+          empty.textContent = 'Aún no hay hechizos en el repertorio.';
+          el.appendChild(empty);
+          return;
+        }
+
+        /* Agrupar por nivel */
+        for (let lvl = 0; lvl <= 9; lvl++) {
+          const group = repertoire.filter((s) => s.level === lvl);
+          if (!group.length) continue;
+          const gTitle = document.createElement('div');
+          gTitle.style.cssText = 'font-family:var(--font-ui);font-size:11px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;letter-spacing:0.06em;margin:16px 0 8px;';
+          gTitle.textContent = spLvlName(lvl);
+          el.appendChild(gTitle);
+          group.forEach((sp) => el.appendChild(buildSpellRow(sp, sc, render)));
+        }
+      };
+
+      await render();
+    }
+
+    function buildSpellRow(sp, sc, reload) {
+      const sch = SP_SCHOOLS[sp.school] || [sp.school, 'var(--gold)'];
+      const row = document.createElement('div');
+      row.style.cssText = 'background:var(--stone);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;overflow:hidden;';
+
+      const headRow = document.createElement('div');
+      headRow.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;';
+
+      const info = document.createElement('div');
+      info.style.cssText = 'flex:1;min-width:0;';
+      const nameEl = document.createElement('div');
+      nameEl.style.cssText = 'font-size:13px;font-weight:600;color:var(--ink);';
+      nameEl.textContent = sp.name;
+      const metaEl = document.createElement('div');
+      metaEl.style.cssText = `font-size:11px;color:${sch[1]};margin-top:1px;`;
+      metaEl.textContent = sch[0]
+        + (sp.concentration ? ' · 🌀 Conc.' : '')
+        + (sp.ritual ? ' · 📜 Ritual' : '')
+        + (sp.damage_dice ? ` · 💥 ${sp.damage_dice}` : '')
+        + (sp.saving_throw ? ` · 🛡️ ${sp.saving_throw}` : '');
+      info.appendChild(nameEl);
+      info.appendChild(metaEl);
+      headRow.appendChild(info);
+
+      /* Toggle preparado (solo modelo preparado, nivel > 0) */
+      if (sc.preparation_model === 'prepared' && sp.level > 0 && !sp.is_always_known) {
+        const prep = document.createElement('label');
+        prep.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:11px;color:var(--ink-muted);cursor:pointer;';
+        prep.addEventListener('click', (e) => e.stopPropagation());
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = !!sp.is_prepared;
+        cb.disabled = !canEdit;
+        cb.style.cssText = 'accent-color:var(--gold);cursor:pointer;';
+        cb.addEventListener('change', async () => {
+          cb.disabled = true;
+          try {
+            await api.put(`/characters/${c.id}/spells/${sp.spell_id}`, { is_prepared: cb.checked });
+            sp.is_prepared = cb.checked;
+            toast.success(cb.checked ? 'Hechizo preparado' : 'Preparación retirada');
+            reload();
+          } catch (err) {
+            cb.checked = !cb.checked;
+            cb.disabled = false;
+            toast.error(err.message);
+          }
+        });
+        prep.appendChild(cb);
+        prep.appendChild(document.createTextNode('Preparado'));
+        headRow.appendChild(prep);
+      }
+
+      if (canEdit) {
+        const del = document.createElement('button');
+        del.style.cssText = 'padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;background:var(--crimson-dim);color:var(--crimson);border:1px solid var(--crimson);';
+        del.textContent = '✕';
+        del.title = 'Quitar del repertorio';
+        del.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (!confirm(`¿Quitar "${sp.name}" del repertorio?`)) return;
+          try {
+            await api.del(`/characters/${c.id}/spells/${sp.spell_id}`);
+            toast.success('Hechizo retirado');
+            reload();
+          } catch (err) { toast.error(err.message); }
+        });
+        headRow.appendChild(del);
+      }
+
+      /* Detalle expandible */
+      const detail = document.createElement('div');
+      detail.style.cssText = 'display:none;padding:0 14px 14px;border-top:1px solid var(--border);';
+      let built = false;
+      headRow.addEventListener('click', () => {
+        const open = detail.style.display === 'block';
+        detail.style.display = open ? 'none' : 'block';
+        if (!built && !open) {
+          built = true;
+          const meta = document.createElement('div');
+          meta.style.cssText = 'font-size:11px;color:var(--ink-muted);margin:10px 0;line-height:1.6;';
+          meta.textContent = `⏱ ${sp.casting_time} · 🎯 ${sp.range_text} · ⌛ ${sp.duration}`
+            + (sp.comp_material && sp.material_description ? ` · Material: ${sp.material_description}` : '');
+          detail.appendChild(meta);
+          (sp.description || '').split('\n\n').forEach((par) => {
+            const p = document.createElement('p');
+            p.style.cssText = 'font-size:12px;color:var(--ink);line-height:1.6;margin:0 0 8px;';
+            p.textContent = par;
+            detail.appendChild(p);
+          });
+          if (sp.higher_levels) {
+            const hl = document.createElement('div');
+            hl.style.cssText = 'font-size:12px;color:var(--ink);line-height:1.6;margin-top:6px;padding:8px 10px;background:var(--gold-glow);border-radius:6px;';
+            hl.innerHTML = '<strong style="color:var(--gold);">A niveles superiores: </strong>';
+            hl.appendChild(document.createTextNode(sp.higher_levels));
+            detail.appendChild(hl);
+          }
+        }
+      });
+
+      row.appendChild(headRow);
+      row.appendChild(detail);
+      return row;
+    }
+
+    async function openSpellAddModal(sc, onSuccess) {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position:fixed;inset:0;background:rgba(9,8,10,0.85);
+        backdrop-filter:blur(8px);z-index:2000;
+        display:flex;align-items:center;justify-content:center;
+        padding:32px 16px;animation:fadeIn var(--dur-normal) var(--ease-smooth);
+      `;
+      const modal = document.createElement('div');
+      modal.style.cssText = `
+        background:var(--stone);border:1px solid var(--border);
+        border-radius:12px;padding:28px;width:100%;max-width:520px;
+        box-shadow:0 24px 64px rgba(0,0,0,0.3);
+      `;
+      const title = document.createElement('div');
+      title.style.cssText = 'font-family:var(--font-display);font-size:18px;font-weight:700;color:var(--ink);margin-bottom:6px;';
+      title.textContent = '+ Añadir hechizo';
+      modal.appendChild(title);
+      const hint = document.createElement('div');
+      hint.style.cssText = 'font-size:11px;color:var(--ink-muted);margin-bottom:16px;';
+      hint.textContent = `Solo hechizos de tu clase hasta nivel ${sc.max_spell_level} (y trucos).`;
+      modal.appendChild(hint);
+
+      const searchInput = document.createElement('input');
+      searchInput.className = 'input';
+      searchInput.placeholder = 'Buscar hechizo por nombre…';
+      searchInput.style.cssText = 'margin-bottom:12px;';
+      modal.appendChild(searchInput);
+
+      const resultList = document.createElement('div');
+      resultList.style.cssText = 'max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;';
+      modal.appendChild(resultList);
+
+      const renderResults = async (q) => {
+        resultList.innerHTML = '<div style="padding:12px;text-align:center;font-size:12px;color:var(--ink-muted);">Buscando…</div>';
+        try {
+          let path = `/spells?per_page=60&class=${encodeURIComponent(sc.class_key)}`;
+          if (q) path += `&search=${encodeURIComponent(q)}`;
+          const res = await api.get(path);
+          let spells = (res.data ?? []).filter((s) => s.level === 0 || s.level <= (sc.max_spell_level || 0));
+          resultList.innerHTML = '';
+          if (!spells.length) {
+            resultList.innerHTML = '<div style="padding:12px;text-align:center;font-size:12px;color:var(--ink-muted);">Sin resultados disponibles</div>';
+            return;
+          }
+          spells.forEach((sp) => {
+            const btn = document.createElement('button');
+            btn.style.cssText = `
+              display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;
+              padding:10px 14px;background:transparent;border:none;border-bottom:1px solid var(--border);
+              cursor:pointer;font-size:13px;color:var(--ink);transition:background var(--dur-fast);
+            `;
+            btn.innerHTML = `<span>${sp.name}</span><span style="font-size:11px;color:var(--ink-muted);">${spLvlName(sp.level)}</span>`;
+            btn.addEventListener('mouseenter', () => btn.style.background = 'var(--stone-light)');
+            btn.addEventListener('mouseleave', () => btn.style.background = 'transparent');
+            btn.addEventListener('click', async () => {
+              btn.disabled = true;
+              try {
+                await api.post(`/characters/${c.id}/spells`, { spell_id: sp.id });
+                toast.success('Hechizo añadido', sp.name);
+                overlay.remove();
+                onSuccess();
+              } catch (err) {
+                toast.error(err.message);
+                btn.disabled = false;
+              }
+            });
+            resultList.appendChild(btn);
+          });
+        } catch (err) {
+          resultList.innerHTML = `<div style="padding:12px;color:var(--crimson);font-size:12px;">${err.message}</div>`;
+        }
+      };
+      renderResults('');
+
+      let searchTimer;
+      searchInput.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => renderResults(searchInput.value.trim()), 300);
+      });
+
+      const btnRow = document.createElement('div');
+      btnRow.style.cssText = 'display:flex;gap:10px;margin-top:16px;';
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'btn';
+      cancelBtn.style.cssText = 'flex:1;background:transparent;border:1px solid var(--border);color:var(--ink-muted);';
+      cancelBtn.textContent = 'Cerrar';
+      cancelBtn.addEventListener('click', () => overlay.remove());
+      btnRow.appendChild(cancelBtn);
+      modal.appendChild(btnRow);
+
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
       document.addEventListener('keydown', function esc(e) {
         if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
       });
