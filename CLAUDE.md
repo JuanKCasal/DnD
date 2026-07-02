@@ -126,7 +126,9 @@ DnD/
 │   └── pages/
 │       ├── login.js
 │       ├── dashboard.js           # 5 stats de comunidad en tiempo real
-│       ├── campaigns.js           # CRUD campañas + metadatos/progresión/reglas (C1)
+│       ├── campaigns.js           # CRUD campañas + metadatos/progresión/reglas (C1);
+│       │                          #   modal de detalle con 7 pestañas (detalles/sesiones/quests/
+│       │                          #   encuentros/trama/DM/personajes) + reasignar DM + añadir personajes
 │       ├── characters.js          # Ficha D&D 5e + modal 5 tabs + panel de combate calculado (~1900 líneas)
 │       ├── sessions.js            # Timeline + detalle + asistencia + botín + cliffhanger/recap + progresión (C4)
 │       ├── quests.js              # #/quests — Aventuras & Misiones con visibilidad DM (C2)

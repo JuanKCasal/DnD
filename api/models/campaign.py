@@ -85,6 +85,7 @@ class CampaignCreate(BaseModel):
 class CampaignUpdate(BaseModel):
     name: Optional[str] = None
     slug: Optional[str] = None
+    dm_id: Optional[UUID] = None
     system: Optional[str] = None
     description: Optional[str] = None
     lore: Optional[str] = None

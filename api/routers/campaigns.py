@@ -208,6 +208,12 @@ async def update_campaign(
     if "status" in updates:
         _assert_valid_transition(row["status"], updates["status"])
 
+    # Reasignar DM: el nuevo dm_id debe ser un miembro existente.
+    if "dm_id" in updates:
+        exists = await conn.fetchval("SELECT 1 FROM members WHERE id = $1", updates["dm_id"])
+        if not exists:
+            raise HTTPException(status_code=400, detail="El DM indicado no existe")
+
     set_clauses = []
     params = []
     for i, (k, v) in enumerate(updates.items(), start=1):
