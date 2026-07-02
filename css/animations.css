@@ -110,13 +110,22 @@
 .login-page {
   position: relative;
   overflow: hidden;
-  /* En móvil, 100vh excede el área visible (barra del navegador) y provoca
-     scroll + descentrado; dvh se ajusta al alto realmente disponible. */
-  min-height: 100vh;
-  min-height: 100dvh;
+  /* Alto EXACTO del display (no min-height): la escena y el canvas miden lo
+     mismo que la pantalla y el fondo, así nunca aparece scroll vertical de
+     página. En móvil, dvh se ajusta a la barra del navegador (100vh se pasaba). */
+  height: 100vh;
+  height: 100dvh;
   background: radial-gradient(120% 120% at 50% 38%, #f7f5ee 0%, #f1efe7 46%, #e9e5d8 100%);
 }
-.login-card { position: relative; z-index: 2; }
+/* La tarjeta queda por encima del fondo; si un formulario largo (registro) no
+   cabe, hace scroll DENTRO de la tarjeta, no en la página. */
+.login-card {
+  position: relative;
+  z-index: 2;
+  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+}
 
 /* Móvil (< 465px): menos padding para que el formulario quepa sin scroll */
 @media (max-width: 465px) {
