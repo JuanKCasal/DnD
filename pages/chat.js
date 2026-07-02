@@ -271,6 +271,12 @@ export async function render(container) {
 
   /* ── Message elements ── */
   function roomMessageEl(m) {
+    if (m.message_type === 'system') {
+      const s = document.createElement('div');
+      s.style.cssText = 'align-self:center;background:var(--stone-light);border:1px solid var(--border);border-radius:12px;padding:5px 14px;font-size:12px;color:var(--ink-muted);text-align:center;max-width:90%;';
+      s.textContent = m.content;
+      return s;
+    }
     const author = m.character_name || m.member_name || 'Anónimo';
     const isDice = m.message_type === 'dice' && m.dice_result;
     const el = document.createElement('div');
