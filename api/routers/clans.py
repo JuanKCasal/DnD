@@ -114,7 +114,14 @@ async def get_clan(
         raise HTTPException(status_code=404, detail="Clan not found")
 
     members = await conn.fetch(
-        "SELECT member_id, clan_role, title, contribution_pts, joined_at FROM clan_members WHERE clan_id = $1",
+        """
+        SELECT cm.member_id, cm.clan_role, cm.title, cm.contribution_pts, cm.joined_at,
+               m.display_name, m.username, m.avatar_url
+        FROM clan_members cm
+        JOIN members m ON m.id = cm.member_id
+        WHERE cm.clan_id = $1
+        ORDER BY cm.joined_at ASC
+        """,
         clan_id,
     )
     data = dict(row)
@@ -206,6 +213,16 @@ async def join_clan(
         "INSERT INTO clan_members (clan_id, member_id, clan_role) VALUES ($1, $2, 'initiate')",
         clan_id, current_user["id"],
     )
+    # Membresía por personaje (CM1/CM5): añade el personaje activo al clan.
+    acid = current_user.get("active_character_id")
+    if acid:
+        try:
+            await conn.execute(
+                "INSERT INTO clan_characters (clan_id, character_id, clan_role) VALUES ($1,$2,'initiate') ON CONFLICT DO NOTHING",
+                clan_id, acid,
+            )
+        except Exception:
+            pass
     await log_event(
         conn, "clan.member_joined", "clan",
         target_id=str(clan_id), actor_member_id=str(current_user["id"]), is_public=True,
@@ -234,6 +251,15 @@ async def accept_invitation(
         "INSERT INTO clan_members (clan_id, member_id, clan_role) VALUES ($1, $2, 'initiate') ON CONFLICT DO NOTHING",
         inv["clan_id"], current_user["id"],
     )
+    acid = current_user.get("active_character_id")
+    if acid:
+        try:
+            await conn.execute(
+                "INSERT INTO clan_characters (clan_id, character_id, clan_role) VALUES ($1,$2,'initiate') ON CONFLICT DO NOTHING",
+                inv["clan_id"], acid,
+            )
+        except Exception:
+            pass
     await log_event(
         conn, "clan.member_joined", "clan",
         target_id=str(inv["clan_id"]), actor_member_id=str(current_user["id"]), is_public=True,

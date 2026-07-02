@@ -976,8 +976,14 @@ C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 
 ```
 Luego `git add -A; git commit -m "feat: CM4 Calendario & Eventos (muro unificado community_posts)"; git push origin main`.
 
-### Fases CM5–CM6 — Pendientes
-Ver `PLAN_MEJORAS_COMUNIDAD.md`: CM5 Clanes como muro social (reutiliza `community_posts` board=clan) · CM6 Salón de la Fama (premios + valoración de DMs).
+### Fase CM5 — Clanes como muro social ✅ COMPLETADA
+- [x] **Sin migración nueva:** el muro reutiliza `community_posts` con `board='clan'` (CM4) y el router `community.py` ya aplica permisos por pertenencia (`_clan_member`: `clan_members` o `clan_characters` del personaje activo).
+- [x] Backend `clans.py`: `get_clan` incluye miembros con nombre/rol; **unirse/aceptar** ahora también añade el **personaje activo** a `clan_characters` (conecta CM1 — sala de clan + muro por personaje).
+- [x] Frontend `frontend/pages/clans.js` (`#/clanes`, "🛡️ Clanes" habilitado en **Comunidad**): descubrir/crear clanes (grid con emblema/color/lema), **perfil de clan** (banner, unirse, lista de miembros) y **muro social** (composer con texto/imagen/**compartir ítem** del catálogo, feed de publicaciones, comentarios).
+- [x] Verificado: `node --check` de `clans.js`/`router.js`; `clan_characters` en create/join/accept de `clans.py`.
+
+### Fase CM6 — Pendiente
+Ver `PLAN_MEJORAS_COMUNIDAD.md`: Salón de la Fama — premios a personajes (Admin/DM) + valoración de DMs por los jugadores + ranking (leaderboard con `member_xp`).
 
 ---
 
