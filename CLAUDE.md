@@ -91,9 +91,13 @@ DnD/
 │   ├── dnd5e_character_creation_guide.md
 │   ├── dnd5e_equipment_guide.md   #   base de las fases I1–I6
 │   └── dnd5e_spells_guide.md      #   base de las fases H1–H6
-├── intro/                         # Fondo mágico del login (referencia autónoma)
-│   ├── fondo-magico.html          #   demo standalone (sello girando + runas + chispas)
-│   └── LEEME.md                   #   integrado en login.js + css/animations.css (.dnd-*)
+├── assets/                        # Recursos de fondo (referencia autónoma; antes intro/)
+│   ├── fondo-magico.html          #   demo standalone del fondo del login (sello + runas + chispas)
+│   ├── README_fondo-magico.md     #   fondo del login → login.js + css/animations.css (.dnd-*)
+│   ├── dnd-fondo-animado.js       #   ⭐ fondo GLOBAL de la app (motas + constelaciones + runas Futhark)
+│   ├── ejemplo_dnd-fondo-animado.html  #   demo del fondo global
+│   └── README_dnd-fondo-animado.md #   API: DnDFondo.montarPantalla({intensidad}) / .montar(el)
+│                                   #   → copiado a frontend/js/ y montado desde router.js (shell autenticado)
 ├── .gitignore
 ├── Dockerfile                     # ⚠️ Dockerfile en raíz (copia api/ → ./api/)
 ├── reset_admin.py                 # Utilidad: resetear password de admin (BD)
@@ -118,13 +122,14 @@ DnD/
 │   ├── js/
 │   │   ├── api.js                 # Fetch centralizado con JWT (get/post/put/del)
 │   │   ├── auth.js                # Sesión, roles, guards
-│   │   ├── router.js              # Hash-based SPA + nav horizontal con mega-menu
+│   │   ├── router.js              # Hash-based SPA + nav horizontal con mega-menu + monta fondo global (DnDFondo)
+│   │   ├── dnd-fondo-animado.js   # Fondo animado global (copia de assets/; window.DnDFondo)
 │   │   ├── utils.js               # Helpers (dice, formatters, etc.)
 │   │   └── components/
 │   │       ├── toast.js           # Notificaciones estilo Sonner
 │   │       └── modal.js           # Diálogos con animación spring
 │   └── pages/
-│       ├── login.js
+│       ├── login.js               # Login/registro + fondo mágico animado (sello/runas/chispas, ver assets/)
 │       ├── dashboard.js           # 5 stats de comunidad en tiempo real
 │       ├── campaigns.js           # CRUD campañas + metadatos/progresión/reglas (C1);
 │       │                          #   modal de detalle con barra lateral de 9 pestañas (detalles/sesiones/
@@ -139,8 +144,12 @@ DnD/
 │       ├── narrative.js           # #/narrative — Trama: arcos/giros + recompensas por nivel (C7)
 │       ├── inventory.js           # Modo player/treasury/catalogue por hash; slots, sintonía, tienda, cargas, packs (~1400 líneas)
 │       ├── members.js             # Grid de miembros + edición de rol
-│       └── spells.js              # Catálogo de hechizos (#/spellbook): filtros, detalle,
-│                                  #   CRUD admin + enlace de componente consumible (H3/H6)
+│       ├── spells.js              # Catálogo de hechizos (#/spellbook): filtros, detalle,
+│       │                          #   CRUD admin + enlace de componente consumible (H3/H6)
+│       ├── chat.js                # #/chat — chat multi-canal: identidad de personaje, IC/OOC, /roll, susurros (CM2)
+│       ├── calendar.js            # #/calendario — muro Calendario & Eventos (CM4)
+│       ├── clans.js               # #/clanes — clanes como muro social (CM5)
+│       └── hall.js                # #/fama — Salón de la Fama: proezas/ranking/valorar DMs (CM6)
 │
 ├── api/                           # FastAPI → Railway
 │   ├── Dockerfile                 # ⚠️ Segundo Dockerfile (copia . → ./api/) — redundante con el de raíz
@@ -176,19 +185,23 @@ DnD/
 │   │   ├── stat_block.py          # StatBlockCreate/Update/Out (bestiario, C5)
 │   │   ├── encounter.py           # EncounterCreate/Update + EncounterMonsterIn + DifficultyPreview (C5)
 │   │   ├── combat.py              # CombatantAdd/Update + 14 condiciones (C6)
-│   │   └── arc.py                 # StoryArc*/PlotTwist* + StoryBeat (C7)
-│   ├── services/                  # Lógica de dominio pura (Fases I4–I5, H4, C4–C7)
+│   │   ├── arc.py                 # StoryArc*/PlotTwist* + StoryBeat (C7)
+│   │   ├── community.py           # PostCreate/Update, CommentCreate, ReactionSet (CM4)
+│   │   └── hall.py                # AwardCreate, RatingCreate (CM6)
+│   ├── services/                  # Lógica de dominio pura (Fases I4–I5, H4, C4–C7, CM3)
 │   │   ├── character_mechanics.py # compute_combat: CA efectiva, velocidad, sigilo, ataques
 │   │   ├── economy.py             # conversión de moneda (cp), peso de monedas, carga/encumbramiento
 │   │   ├── spellcasting.py        # compute_spellcasting: CD/ataque, ranuras full/half/third/pact,
 │   │   │                          #   límites, disponibilidad (can_learn) — clase ES→canónica
 │   │   ├── progression.py         # XP_THRESHOLDS/BPC, level_for_xp, xp_progress (C4)
 │   │   ├── encounter_math.py      # balanceo DMG: umbrales XP, CR→XP, multiplicadores, dificultad (C5)
-│   │   └── treasure.py            # tesoro por nivel/tier + rarezas (C7)
+│   │   ├── treasure.py            # tesoro por nivel/tier + rarezas (C7)
+│   │   └── community_feed.py      # post_system_message → Saludos / Salón de la Fama (CM3)
 │   └── routers/
 │       ├── auth.py                # POST /login, /register
 │       ├── members.py             # GET/POST/PUT /members (POST admin-only)
-│       ├── campaigns.py           # CRUD /campaigns + DELETE + metadatos C1 + /progression (C4)
+│       ├── me.py                  # /me/active-character — personaje activo (identidad social, CM1)
+│       ├── campaigns.py           # CRUD /campaigns + DELETE + metadatos C1 + /progression (C4) + provisión de sala (CM2)
 │       ├── adventures.py          # CRUD /campaigns/{id}/adventures (C2)
 │       ├── quests.py              # CRUD /campaigns/{id}/quests (C2)
 │       ├── characters.py          # CRUD /characters + /hp /conditions /spell-slots + /combat (I4)
@@ -201,8 +214,11 @@ DnD/
 │       │                          #   tesoro de campaña, /currency + /carry, /shop/buy|sell,
 │       │                          #   /use /use-charge /recharge, /packs, /sessions/{id}/loot  (~1150 líneas)
 │       ├── ranks.py               # CRUD /ranks
-│       ├── clans.py               # CRUD /clans + membership + invitations
-│       ├── chat.py                # GET/POST /chat/rooms + /messages + DMs
+│       ├── chat.py                # salas con visibilidad por personaje activo + mensajes (IC/OOC/dice) +
+│       │                          #   susurros char↔char + provisión de salas (CM1/CM2)
+│       ├── clans.py               # CRUD /clans + membresía (miembro+personaje) + invitaciones (CM5)
+│       ├── community.py           # /community/posts (+comentarios/reacciones) — muros events/hall/clan (CM4)
+│       ├── hall.py                # /hall/awards, /leaderboard, /ratings, /dm-ratings (CM6)
 │       ├── events.py              # GET /events (event log público)
 │       └── spells.py              # /spells (catálogo CRUD admin), repertorio del personaje
 │                                  #   (/characters/{id}/spells), cast/rest/concentration,
@@ -229,7 +245,11 @@ DnD/
 │       ├── 010_session_log.sql        # sessions prep_notes/cliffhanger/refs (C4)
 │       ├── 011_bestiary_encounters.sql # stat_blocks/encounters/encounter_monsters (C5)
 │       ├── 012_combat_tracker.sql     # combat_trackers/combatants (C6)
-│       └── 013_narrative_rewards.sql  # story_arcs/plot_twists (C7)
+│       ├── 013_narrative_rewards.sql  # story_arcs/plot_twists (C7)
+│       ├── 014_community_identity.sql # chat_room_type +welcome/hall/admin; clan_characters (CM1)
+│       ├── 015_community_rooms.sql    # UPSERT de salas globales de chat (CM2)
+│       ├── 016_community_walls.sql    # community_posts/comments/reactions (CM4)
+│       └── 017_awards_ratings.sql     # awards + dm_ratings (CM6)
 │                                  # (no hay 002: el seed es el script standalone seed_items.py)
 │
 └── .github/
@@ -316,8 +336,10 @@ Estructura del mega-menu (en `router.js`, constante `NAV_GROUPS`):
 - **Dashboard** → `#/dashboard`
 - **Mi DnD:** Personajes `#/characters`, Inventario del Jugador `#/inventory` | Perfil *(deshabilitado)*
 - **Juego:** Campañas `#/campaigns`, Sesiones `#/sessions`, Tesoros `#/treasury`, Aventuras & Misiones `#/quests`, Encuentros `#/encounters`, Trama `#/narrative`, Compendio `#/world`
-- **Comunidad:** Chat, Calendario & Eventos, Clanes, Salón de la Fama *(todos deshabilitados)*
+- **Comunidad:** Chat `#/chat`, Calendario & Eventos `#/calendario`, Clanes `#/clanes`, Salón de la Fama `#/fama` (CM1–CM6)
 - **Configuración:** Miembros `#/members`, Catálogo `#/catalogue`, Catálogo de Hechizos `#/spellbook` | Event Log *(deshabilitado)*
+- **Selector de personaje activo** en la barra superior (`router.js`): identidad social usada por el chat y los clanes (CM1).
+- Grupo **Mundo** eliminado (Compendio se movió a Juego; Clanes y Salón de la Fama a Comunidad).
 
 **Rutas de inventario — todas usan `inventory.js`, modo por hash:**
 - `#/inventory` → modo `player` — equipamiento del jugador entre personajes
@@ -346,7 +368,8 @@ item_type:       'weapon'|'armor'|'potion'|'spell_scroll'|'ring'|'rod'|'staff'|'
 spell_school:    'abjuration'|'conjuration'|'divination'|'enchantment'|
                  'evocation'|'illusion'|'necromancy'|'transmutation'   (Fase H1)
 item_rarity:     'common'|'uncommon'|'rare'|'very_rare'|'legendary'|'artifact'
-chat_room_type:  'general'|'clan'|'rank'|'campaign'|'dm_channel'|'ooc'|'announcements'
+chat_room_type:  'general'|'clan'|'rank'|'campaign'|'dm_channel'|'ooc'|'announcements'|
+                 'welcome'|'hall_of_fame'|'admin'   -- welcome/hall_of_fame/admin añadidos en CM1 (014)
 message_type:    'ic'|'ooc'|'dice'|'emote'|'system'|'whisper'
 dm_message_type: 'ic'|'ooc'|'whisper'
 ```
@@ -362,6 +385,7 @@ clans               (id, name, slug, description, motto, emblem_url, color_hex, 
                      is_public, requires_approval, max_members, lore, active)
 clan_members        (clan_id, member_id PK, clan_role, title, contribution_pts, joined_at, approved_by)
 clan_invitations    (id, clan_id, invited_member_id, invited_by, status::invite_status, resolved_at)
+clan_characters     (clan_id, character_id PK, clan_role, title, joined_at)   -- membresía por PERSONAJE (CM1, 014)
 
 campaigns           (id, name, slug UNIQUE, dm_id→members, system, status::campaign_status, description,
                      lore, cover_image_url, is_public, world_name, setting, start_date, end_date,
@@ -456,6 +480,17 @@ direct_messages     (id, from_character_id, to_character_id, content, message_ty
 
 event_log           (id, occurred_at, actor_member_id, actor_character_id, action, target_type,
                      target_id, target_name, before JSONB, after JSONB, metadata JSONB, is_public)
+
+-- Comunidad (Fases CM4–CM6). El chat usa las tablas chat_* de arriba.
+community_posts     (id, board (events|hall|clan), clan_id→clans, author_member_id→members,
+                     author_character_id→characters, title, body, image_url, item_id→items,
+                     event_date, pinned, created_at, deleted_at)   -- muros reutilizados por CM4/CM5/CM6
+community_comments  (id, post_id→community_posts, author_member_id, author_character_id, body, created_at)
+community_reactions (post_id→community_posts, character_id→characters, emoji PK)
+awards              (id, character_id→characters, campaign_id→campaigns, title, description, icon,
+                     rarity, awarded_by→members, created_at)   -- medallas del Salón de la Fama (CM6)
+dm_ratings          (id, dm_member_id→members, campaign_id→campaigns, rater_member_id, rater_character_id,
+                     stars 1-5, comment, UNIQUE(campaign_id, rater_member_id))   -- valoración de DMs (CM6)
 ```
 
 ### Mapeo campos Pydantic ↔ columnas DB en Characters
@@ -907,20 +942,19 @@ Luego `git add -A; git commit -m "feat: C7 arcos/giros + guía de recompensas + 
 
 ## Próximas Fases (Pendiente)
 
-### Fase 8 — Chat y Comunidad en tiempo real
-- [ ] Frontend: página Chat — rooms list + room view con mensajes IC/OOC/dice
-- [ ] Frontend: Direct Messages entre personajes
-- [ ] Frontend: Clanes — lista, perfil, membresía, invitaciones
-- [ ] Frontend: Rangos — tabla con colores y niveles de XP
-- [ ] Kafka consumer → Discord Webhook (level-up, session created)
-- [ ] Dice roller global flotante (bottom-left, `/roll 2d6+3`, d4/d6/d8/d10/d12/d20/d100)
+### Fase 8 — Chat y Comunidad ✅ ENTREGADA vía CM1–CM6 (ver más abajo)
+- [x] Chat: página con canales, mensajes IC/OOC/dice y **susurros** entre personajes (CM2)
+- [x] Clanes: lista, perfil, membresía y muro social (CM5)
+- [x] Calendario & Eventos + Salón de la Fama (CM4/CM6)
+- [ ] Frontend: Rangos — tabla con colores y niveles de XP (pendiente)
+- [ ] Kafka consumer → Discord Webhook (pendiente — CM usa llamadas directas)
+- [ ] Dice roller global flotante (el chat ya soporta `/roll`; falta el widget global)
 
 ### Fase 9 — Worldbuilding y contenido
-- [ ] NPCs, Locations, Quests (tablas en schema, routers pendientes)
-- [ ] Salón de la Fama — miembros destacados, stats de comunidad
-- [ ] Calendario & Eventos
-- [ ] Event Log frontend page
-- [ ] Perfil de usuario completo
+- [x] NPCs, Locations, Quests expuestos (routers worldbuilding/quests, C2/C3) + frontend (Compendio, Aventuras & Misiones)
+- [x] Salón de la Fama (CM6) · Calendario & Eventos (CM4)
+- [ ] Event Log frontend page (pendiente)
+- [ ] Perfil de usuario completo (pendiente)
 
 ---
 

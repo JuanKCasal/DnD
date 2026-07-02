@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fondo animado D&D — ejemplo</title>
+<style>
+  html, body { margin: 0; }
+  /* Tu color de fondo plano va aquí (o en el contenedor). */
+  body { background: #F5F3EE; min-height: 100vh; font-family: Georgia, 'Times New Roman', serif; color: #3a352c; }
+  .contenido { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 80px 32px; }
+  h1 { color: #6b5a1a; letter-spacing: 0.02em; }
+  p { color: #6a6355; line-height: 1.6; max-width: 60ch; }
+</style>
+</head>
+<body>
+  <!--
+    Ejemplo 1 — Fondo de TODA la página (más simple).
+    El canvas se inserta con position:fixed detrás de todo.
+    Asegúrate de que tu contenido tenga position:relative y z-index >= 1
+    (como .contenido de abajo) para quedar por encima de la animación.
+  -->
+  <div class="contenido">
+    <h1>✦ Personajes ✦</h1>
+    <p>Este es un ejemplo de cómo se ve el fondo animado detrás de tu contenido.
+       La animación (motas de polvo, constelaciones y runas nórdicas con brillo
+       de vela) se concentra en los laterales y se aclara en el centro para no
+       competir con la interfaz.</p>
+    <p>Copia <strong>dnd-fondo-animado.js</strong> a tu proyecto y míralo funcionando.</p>
+  </div>
+
+  <script src="dnd-fondo-animado.js"></script>
+  <script>
+    // Fondo de toda la ventana:
+    DnDFondo.montarPantalla();
+
+    // Si prefieres montarlo solo dentro de una sección concreta, usa esto
+    // en lugar de la línea anterior:
+    //   DnDFondo.montar(document.querySelector('#mi-seccion'));
+    //
+    // Opciones:
+    //   DnDFondo.montarPantalla({ intensidad: 1.3 }); // más notorio
+    //   DnDFondo.montar(el, { intensidad: 0.7 });     // más sutil
+  </script>
+</body>
+</html>

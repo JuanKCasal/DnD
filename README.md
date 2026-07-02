@@ -36,7 +36,7 @@ Repo: https://github.com/JuanKCasal/DnD
 
 ## 1. Autenticación y roles
 
-- **Login** con usuario/contraseña → JWT guardado en `localStorage` (`dnd_token`); datos de usuario en `dnd_user`.
+- **Login** con usuario/contraseña → JWT guardado en `localStorage` (`dnd_token`); datos de usuario en `dnd_user`. Pantalla con **fondo mágico animado** (sello del gremio girando, runas y chispas; responsive en móvil) — ver `intro/`.
 - **Registro** de nuevos miembros.
 - Tres roles: **admin**, **dm** (dungeon master), **player**. Las rutas y acciones se protegen por rol tanto en frontend (guards) como en backend (`require_role`).
 
@@ -80,6 +80,7 @@ Página de inicio con **5 estadísticas de comunidad en tiempo real** (miembros,
 - **Progresión:** nivel inicial/actual/objetivo y **método de subida** (`xp` o `milestone`).
 - **Sistema y reglas de mesa:** edición de reglas (`dnd_5e_2014/2024/homebrew`), frecuencia de sesiones, **reglas variantes** y editor de **reglas caseras** (house rules).
 - Miembros de campaña y **tesoro** propio (ítems + monedas) — ver §12–13.
+- **Modal de detalle** (al hacer clic en una campaña): barra lateral con 9 pestañas — Detalles (+ progresión), Sesiones, Aventuras & Misiones, Encuentros, Trama, Compendio, Tesoros, **DM** (reasignar) y **Personajes** (añadir) — para ver todo el progreso desde un solo lugar.
 
 ---
 
