@@ -924,6 +924,28 @@ Luego `git add -A; git commit -m "feat: C7 arcos/giros + guía de recompensas + 
 
 ---
 
+## Sistema de Comunidad — Fases CM1–CM6 (ver PLAN_MEJORAS_COMUNIDAD.md)
+
+Chat multi-canal (hablas **como personaje**), Calendario/Eventos, Clanes como muro social y Salón de la Fama. Reutiliza el schema de `chat_*`, `clans`, `event_log`, `member_xp` (ya existían sin frontend).
+
+### Fase CM1 — Identidad de personaje + motor de visibilidad + clanes por personaje ✅ COMPLETADA (pendiente de desplegar)
+- [x] Migración `db/migrations/014_community_identity.sql` — `ALTER TYPE chat_room_type ADD VALUE 'welcome'/'hall_of_fame'/'admin'` (idempotente); tabla **`clan_characters`** (membresía de clan por **personaje**, D2) + migración de datos desde `clan_members` (personaje activo o el más antiguo). `clan_members` se conserva para propiedad del jugador.
+- [x] Router `api/routers/me.py` (`/api/v1/me`): `GET/PUT /me/active-character` — fija `members.active_character_id` (identidad social, D1); valida que el personaje sea del usuario. Registrado en `main.py`.
+- [x] `api/routers/chat.py`: `list_rooms` reescrito — **motor de visibilidad por personaje activo**: públicas (excluye canal `admin`) + campañas del jugador + clanes del **personaje activo** (`clan_characters`) + por rango; **staff (admin/dm) ve todo**. Filtrado en el backend (no solo UI).
+- [x] Frontend `router.js`: **selector de personaje activo** en la barra superior (avatar 🎭 nombre); al cambiarlo hace `PUT /me/active-character` y refresca la vista (identidad + visibilidad).
+- [x] Verificado: `ast.parse` de `me.py`; `node --check` de `router.js`; reescritura de `chat.py` confirmada (grep). `clan_characters` con PK (clan_id, character_id).
+
+**⚠️ PENDIENTE DE DESPLIEGUE (CM1) — desde PowerShell:**
+```
+C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 014_community_identity
+```
+Luego `git add -A; git commit -m "feat: CM1 identidad de personaje + visibilidad de canales + clanes por personaje"; git push origin main`.
+
+### Fases CM2–CM6 — Pendientes
+Ver `PLAN_MEJORAS_COMUNIDAD.md`: CM2 chat (canales + provisión automática + entrega en vivo + susurros) · CM3 canales de sistema (Saludos/Fama) · CM4 Calendario & Eventos · CM5 Clanes como muro social · CM6 Salón de la Fama (premios + valoración de DMs).
+
+---
+
 ## Instrucciones para el Agente (Claude)
 
 ### Al iniciar una sesión nueva

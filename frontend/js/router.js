@@ -1,4 +1,5 @@
 import { auth } from './auth.js';
+import { api } from './api.js';
 
 const routes = {
   '#/login':      () => import('../pages/login.js').then(m => m.render),
@@ -221,6 +222,44 @@ function renderShell(user) {
   logoutBtn.textContent = 'Salir';
   logoutBtn.addEventListener('click', auth.logout);
 
+  /* Selector de personaje activo (CM1): con qué personaje "hablas" en la comunidad */
+  const charSwitch = document.createElement('select');
+  charSwitch.className = 'nav-char-switch';
+  charSwitch.title = 'Personaje activo';
+  charSwitch.style.cssText = 'background:var(--stone-light);border:1px solid var(--border);color:var(--ink);border-radius:8px;padding:6px 10px;font-family:var(--font-ui);font-size:12px;max-width:170px;cursor:pointer;display:none;';
+  charSwitch.addEventListener('change', async () => {
+    try {
+      await api.put('/me/active-character', { character_id: charSwitch.value || null });
+      const u = auth.getUser();
+      if (u) { u.active_character_id = charSwitch.value || null; auth.setUser(u); }
+      navigate(); // refrescar la vista con la nueva identidad/visibilidad
+    } catch (_) { /* sin bloqueo */ }
+  });
+  (async () => {
+    try {
+      const [charsRes, activeRes] = await Promise.all([
+        api.get(`/characters?member_id=${user.id}&per_page=100`),
+        api.get('/me/active-character').catch(() => ({ data: {} })),
+      ]);
+      const chars = charsRes.data ?? [];
+      if (!chars.length) return;
+      charSwitch.innerHTML = '';
+      const none = document.createElement('option');
+      none.value = ''; none.textContent = '🎭 Sin personaje';
+      charSwitch.appendChild(none);
+      chars.forEach(c => {
+        const o = document.createElement('option');
+        o.value = c.id;
+        o.textContent = '🎭 ' + c.name;
+        charSwitch.appendChild(o);
+      });
+      const activeId = activeRes.data?.active_character_id;
+      if (activeId) charSwitch.value = activeId;
+      charSwitch.style.display = '';
+    } catch (_) { /* sin personajes o sin acceso */ }
+  })();
+
+  userArea.appendChild(charSwitch);
   userArea.appendChild(avatar);
   userArea.appendChild(userMeta);
   userArea.appendChild(logoutBtn);

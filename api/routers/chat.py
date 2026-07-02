@@ -16,38 +16,53 @@ from api.models.chat import (
 router = APIRouter(prefix="/api/v1/chat", tags=["chat"])
 
 
+_ROOM_COLS = """
+    SELECT r.id, r.name, r.slug, r.type AS room_type, r.clan_id, r.campaign_id,
+           r.rank_required_id, r.description, r.icon, r.is_readonly,
+           r.is_ic, r.sort_order, r.created_at
+    FROM chat_rooms r
+"""
+
+
 @router.get("/rooms", response_model=dict)
 async def list_rooms(
     conn: asyncpg.Connection = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    """Return rooms accessible to the current user based on rank, clan membership, campaign membership."""
+    """Salas visibles según el PERSONAJE ACTIVO (CM1): públicas + campañas del
+    jugador + clanes del personaje activo + por rango. El staff (admin/dm) ve
+    todo, incluido el canal 'admin'."""
+    # El staff ve todas las salas.
+    if current_user["role"] in ("admin", "dm"):
+        rows = await conn.fetch(_ROOM_COLS + " ORDER BY r.sort_order ASC, r.name ASC")
+        return {"data": records_to_list(rows)}
+
+    active_char = await conn.fetchval(
+        "SELECT active_character_id FROM members WHERE id = $1", current_user["id"]
+    )
     rows = await conn.fetch(
-        """
-        SELECT r.id, r.name, r.slug, r.type AS room_type, r.clan_id, r.campaign_id,
-               r.rank_required_id, r.description, r.icon, r.is_readonly,
-               r.is_ic, r.sort_order, r.created_at
-        FROM chat_rooms r
+        _ROOM_COLS + """
         WHERE
-            -- General rooms with no restrictions
-            (r.clan_id IS NULL AND r.campaign_id IS NULL AND r.rank_required_id IS NULL)
-            -- OR clan rooms where user is member
-            OR (r.clan_id IS NOT NULL AND EXISTS (
-                SELECT 1 FROM clan_members cm WHERE cm.clan_id = r.clan_id AND cm.member_id = $1
-            ))
-            -- OR campaign rooms where user is member
+            -- Públicas: sin clan/campaña/rango y que NO sean el canal de administradores
+            (r.clan_id IS NULL AND r.campaign_id IS NULL AND r.rank_required_id IS NULL AND r.type <> 'admin')
+            -- Salas de campaña donde el jugador participa
             OR (r.campaign_id IS NOT NULL AND EXISTS (
                 SELECT 1 FROM campaign_members cm WHERE cm.campaign_id = r.campaign_id AND cm.member_id = $1
             ))
-            -- OR rank-required rooms where user has that rank or better
-            OR (r.rank_required_id IS NOT NULL AND $2::uuid IS NOT NULL AND EXISTS (
+            -- Salas de clan donde el PERSONAJE ACTIVO es miembro (CM1/D2)
+            OR (r.clan_id IS NOT NULL AND $2::uuid IS NOT NULL AND EXISTS (
+                SELECT 1 FROM clan_characters cc WHERE cc.clan_id = r.clan_id AND cc.character_id = $2
+            ))
+            -- Salas por rango
+            OR (r.rank_required_id IS NOT NULL AND $3::uuid IS NOT NULL AND EXISTS (
                 SELECT 1 FROM ranks r2
                 JOIN ranks rr ON rr.id = r.rank_required_id
-                WHERE r2.id = $2 AND r2.level >= rr.level
+                WHERE r2.id = $3 AND r2.level >= rr.level
             ))
         ORDER BY r.sort_order ASC, r.name ASC
         """,
         current_user["id"],
+        active_char,
         current_user.get("rank_id"),
     )
     return {"data": records_to_list(rows)}
