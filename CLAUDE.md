@@ -350,7 +350,18 @@ quests              (id, campaign_id→campaigns, adventure_id→adventures (C2)
                      status::quest_status, quest_type (main|side|personal|faction|fetch|escort|bounty, C2),
                      quest_giver_npc_id→npcs, reward_description, reward_xp, reward_gp, objectives JSONB
                      [{text,completed,optional}], visible_to_players (C2), notes, completed_at)
-                     -- expuesta en Fase C2 (routers/quests.py); npcs/locations/factions siguen sin exponer
+                     -- expuesta en Fase C2 (routers/quests.py)
+
+-- Mundo vivo (expuesto en Fase C3 vía routers/worldbuilding.py)
+locations           (id, campaign_id→campaigns, parent_location_id→locations, name, type::location_type,
+                     description, map_url, is_discovered, notes)   -- notes = DM-only; is_discovered gatea visibilidad
+factions            (id, campaign_id→campaigns, name, slug, description, goals, alignment::alignment_type,
+                     emblem_url, leader_name, reputation_scale JSONB, UNIQUE(campaign_id, slug))
+faction_reputation  (faction_id→factions, character_id→characters PK, reputation_pts, rank_title, updated_at)
+npcs                (id, campaign_id→campaigns, name, race, class (→npc_class), role, relationship::npc_relationship,
+                     attitude (C3), description, portrait_url, stat_block JSONB, location_id→locations,
+                     faction_id→factions, alive, motivation (C3), secret (C3), notes, dm_only (C3))
+                     -- dm_only/secret/motivation/notes/stat_block se ocultan a jugadores en el backend
 
 items               (id, name, description, type::item_type, rarity::item_rarity, weight, value_gp,
                      is_magical, is_consumable, requires_attunement, attunement_restriction,
@@ -755,8 +766,21 @@ C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 
 ```
 Luego `git add -A; git commit -m "feat: C2 aventuras/arcos + misiones (quests) con visibilidad DM/jugador"; git push origin main`.
 
-### Fases C3–C7 — Pendientes
-Ver `PLAN_MEJORAS_CAMPAÑAS.md`: C3 NPCs/localizaciones/facciones · C4 bitácora + progresión · C5 bestiario + encuentros + balanceo · C6 combat tracker · C7 recompensas/mapas/visibilidad.
+### Fase C3 — Mundo vivo: NPCs, Localizaciones y Facciones ✅ COMPLETADA (pendiente de desplegar)
+- [x] Migración `db/migrations/009_worldbuilding_fields.sql` — añade a `npcs`: `attitude`, `motivation`, `secret`, `dm_only` (guía §9). `locations`, `factions`, `faction_reputation` ya tenían columnas suficientes (001).
+- [x] Modelos `location.py`, `npc.py` (`npc_class` → columna `class`), `faction.py` (+ `ReputationSet`) con validadores de enums (`location_type`, `npc_relationship`, actitud, `alignment_type`).
+- [x] Router único `api/routers/worldbuilding.py` bajo `/api/v1/campaigns/{id}/{locations|npcs|factions}` (+ `/factions/{id}/reputation`): CRUD completo, **solo DM de la campaña o admin escribe**. **Filtrado DM-only en el backend** (guía §17 regla 4): jugadores solo ven localizaciones `is_discovered` (sin `notes`), NPCs `dm_only=FALSE` (sin `secret`/`motivation`/`notes`/`stat_block`). `stat_block`/`reputation_scale` (JSONB) parseados en el router; `class` aliaseado a `npc_class`; casts `::location_type`/`::npc_relationship`/`::alignment_type`. Registrado en `main.py`.
+- [x] Frontend `frontend/pages/world.js` (`#/world`, "🌍 Compendio" en grupo **Mundo**): selector de campaña + pestañas NPCs / Localizaciones / Facciones con CRUD; sección "Contenido del DM" en el modal de NPC; jerarquía padre en localizaciones.
+- [x] Verificado: `ast.parse` de modelos/router; `node --check` de `world.js`/`router.js`; test unitario del stripping DM-only (jugador oculta secretos; DM ve todo y `stat_block`→dict).
+
+**⚠️ PENDIENTE DE DESPLIEGUE (C3) — desde PowerShell:**
+```
+C:\Users\casal\AppData\Local\Programs\Python\Python312\python.exe db/migrate.py 009_worldbuilding_fields
+```
+Luego `git add -A; git commit -m "feat: C3 mundo vivo (NPCs/localizaciones/facciones) con visibilidad DM/jugador"; git push origin main`.
+
+### Fases C4–C7 — Pendientes
+Ver `PLAN_MEJORAS_CAMPAÑAS.md`: C4 bitácora + progresión · C5 bestiario + encuentros + balanceo · C6 combat tracker · C7 recompensas/mapas/visibilidad.
 
 ---
 
