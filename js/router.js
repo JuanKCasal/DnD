@@ -83,6 +83,19 @@ const NAV_GROUPS = [
 
 const app = document.getElementById('app');
 let openDropdown = null;
+let fondoAnimado = null;
+
+/* Fondo animado global (motas + constelaciones + runas). Se monta una vez
+   dentro del shell autenticado y se retira en el login (que trae el suyo). */
+function mountFondo() {
+  if (fondoAnimado || !window.DnDFondo) return;
+  fondoAnimado = window.DnDFondo.montarPantalla({ intensidad: 1 });
+}
+function unmountFondo() {
+  if (!fondoAnimado) return;
+  fondoAnimado.destruir();
+  fondoAnimado = null;
+}
 
 /* ============================================
    BUILD SHELL
@@ -452,6 +465,7 @@ async function navigate() {
   if (isPublic) {
     const shell = document.querySelector('.app-shell');
     if (shell) shell.remove();
+    unmountFondo();
     app.innerHTML = '';
   } else {
     const user = auth.getUser();
@@ -460,6 +474,7 @@ async function navigate() {
       app.innerHTML = '';
     }
     renderShell(user);
+    mountFondo();
     updateActiveNav(hash);
     closeDropdowns();
     closeDrawer();

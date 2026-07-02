@@ -269,7 +269,7 @@ function shakeCard(el) {
   setTimeout(() => el.classList.remove('shake'), 500);
 }
 
-/* ---- Fondo mágico (integrado desde intro/fondo-magico.html) ---- */
+/* ---- Fondo mágico (integrado desde assets/fondo-magico.html) ---- */
 
 // Runas flotantes: [left%, top%, tamaño px, opacidad pico, duración s, retraso s, glifo]
 const MAGIC_RUNES = [
