@@ -115,10 +115,17 @@ Enlaces cruzados: cada tarjeta enruta a su sección (`#/sessions`, `#/quests`, `
 - [x] Verificado (integridad y balance vía file-tool; el mount del sandbox tuvo glitches de
   sincronización, ajenos al archivo real).
 
-### Fase N3 — Panel lateral (misiones, eventos, honor) ⏳
-- [ ] **Misiones**: recorrer campañas → quests; agrupar abiertas/cumplidas; recompensas y rango.
-- [ ] **Próximos Eventos**: `/community/posts?board=events` ordenados por `event_date`.
-- [ ] **Salón de Honor**: `/hall/leaderboard` (top 5) + `/hall/awards` (medallas).
+### Fase N3 — Panel lateral (misiones, eventos, honor) ✅ COMPLETADA
+- [x] Sección `.nt-panel` (grid `auto-fit minmax(280px,1fr)`) con 3 tarjetas de pergamino.
+- [x] **⚔ Misiones**: recorre `/campaigns` (máx 8) → `/campaigns/{id}/quests` (`Promise.allSettled`),
+  agrupa **abiertas** (`active`) primero y **cumplidas** (`completed`, atenuadas), top 6, con
+  mini-sello de rareza por `reward_xp` y `✦ XP · oro · estado`.
+- [x] **🗓 Próximos Eventos**: `/community/posts?board=events` ordenados por `event_date`
+  (próximos primero, con fallback), badge de fecha (día + mes) + título.
+- [x] **🏆 Salón de Honor**: `/hall/leaderboard` top 5 (posición coloreada 1º–3º + resto) con XP,
+  separador `dashed` y última condecoración de `/hall/awards` (`🎖️ «título» → personaje`).
+- [x] Integrado en la carga inicial y en el botón **↻ Actualizar**; cada tarjeta degrada sola.
+- [x] Verificado por file-tool (archivo cierra íntegro en 454 líneas; mount del sandbox con glitches).
 
 ### Fase N4 — Aventureros y Gremios ⏳
 - [ ] **Nuevos Aventureros**: fichas desde `/characters` (retrato o emoji de clase).
