@@ -122,6 +122,34 @@ function injectStyle() {
   .nt-award{font-size:13px;color:#6f6046;}
   .nt-empty-sm{font-size:13px;color:#9a8558;font-style:italic;padding:8px 0;}
 
+  /* Nuevos Aventureros */
+  .nt-advs{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:18px;}
+  .nt-adv{text-align:center;background:linear-gradient(158deg,#fdf8ec,#f0e6cc);border:1px solid #d8c79b;
+    border-radius:10px;padding:20px 16px;transition:transform .3s cubic-bezier(.2,.85,.25,1),box-shadow .3s;}
+  .nt-adv:hover{transform:translateY(-6px);box-shadow:0 16px 30px rgba(74,63,46,.2);}
+  .nt-adv-av{width:66px;height:66px;margin:0 auto 10px;border-radius:50%;overflow:hidden;font-size:30px;
+    display:flex;align-items:center;justify-content:center;color:#fdf6e3;
+    box-shadow:inset 0 2px 6px rgba(255,255,255,.4),0 3px 8px rgba(0,0,0,.18);}
+  .nt-adv-av img{width:100%;height:100%;object-fit:cover;}
+  .nt-adv-name{font-family:'Cinzel',serif;font-weight:600;font-size:17px;color:#4a3f2e;}
+  .nt-adv-meta{font-size:13.5px;color:#9a8558;margin-top:2px;}
+  .nt-adv-lvl{display:inline-block;margin-top:10px;padding:3px 12px;border-radius:999px;background:#efe5cd;
+    border:1px solid #d3bf8f;font-size:12px;font-weight:600;color:#6f5620;}
+
+  /* Gremios */
+  .nt-clans{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;}
+  .nt-clan{display:flex;align-items:center;gap:14px;background:linear-gradient(158deg,#fdf8ec,#f0e6cc);
+    border:1px solid #d8c79b;border-left:5px solid var(--cc,#8a6d2f);border-radius:10px;padding:16px 18px;
+    transition:transform .3s cubic-bezier(.2,.85,.25,1),box-shadow .3s;}
+  .nt-clan:hover{transform:translateY(-4px);box-shadow:0 14px 28px rgba(74,63,46,.18);}
+  .nt-clan-emb{width:56px;height:56px;flex-shrink:0;border-radius:12px;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;font-family:'Cinzel',serif;font-weight:700;font-size:22px;}
+  .nt-clan-emb img{width:100%;height:100%;object-fit:cover;border-radius:12px;}
+  .nt-clan-main{flex:1;min-width:0;}
+  .nt-clan-name{font-family:'Cinzel',serif;font-weight:600;font-size:18px;color:#4a3f2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .nt-clan-motto{font-style:italic;font-size:13px;color:#6f6046;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .nt-clan-mem{font-size:12px;color:#9a8558;}
+
   @keyframes dropPin{0%{opacity:0;transform:translateY(-52px) rotate(-8deg) scale(.94)}55%{opacity:1}72%{transform:translateY(7px) rotate(1.4deg) scale(1.012)}100%{opacity:1;transform:translateY(0) rotate(0) scale(1)}}
   @keyframes sealPop{0%{transform:scale(0) rotate(-24deg);opacity:0}60%{transform:scale(1.2) rotate(7deg)}100%{transform:scale(1) rotate(0);opacity:1}}
   @keyframes glowPulse{0%,100%{box-shadow:inset 0 0 40px rgba(201,162,39,.16),0 12px 30px rgba(74,63,46,.2),0 0 0 rgba(201,162,39,0)}50%{box-shadow:inset 0 0 44px rgba(201,162,39,.28),0 12px 30px rgba(74,63,46,.2),0 0 26px rgba(201,162,39,.5)}}
@@ -187,6 +215,17 @@ function ntRel(v) {
   if (s < 2592000) return `hace ${Math.floor(s / 86400)} d`;
   return d.toLocaleDateString('es');
 }
+function ntClassEmoji(cl) {
+  const k = String(cl || '').toLowerCase();
+  const map = {
+    guerrero: '⚔️', fighter: '⚔️', mago: '🧙', wizard: '🧙',
+    'clérigo': '✨', clerigo: '✨', cleric: '✨', 'pícaro': '🗡️', picaro: '🗡️', rogue: '🗡️',
+    explorador: '🏹', ranger: '🏹', 'bárbaro': '🪓', barbaro: '🪓', barbarian: '🪓',
+    bardo: '🎵', bard: '🎵', druida: '🌿', druid: '🌿', hechicero: '🔮', sorcerer: '🔮',
+    brujo: '👁️', warlock: '👁️', monje: '👊', monk: '👊', 'paladín': '🛡️', paladin: '🛡️',
+  };
+  return map[k] || '🧙';
+}
 
 export async function render(container) {
   if (!auth.requireAuth()) return;
@@ -246,6 +285,16 @@ export async function render(container) {
         <div id="nt-honor"><div class="nt-empty-sm">Cargando…</div></div>
       </div>
     </div>
+
+    <div class="nt-section">
+      <h2 class="nt-sec-title">🧙 Nuevos Aventureros</h2>
+      <div class="nt-advs" id="nt-advs"><div class="nt-empty-sm">Cargando…</div></div>
+    </div>
+
+    <div class="nt-section">
+      <h2 class="nt-sec-title">🛡️ Gremios</h2>
+      <div class="nt-clans" id="nt-clans"><div class="nt-empty-sm">Cargando…</div></div>
+    </div>
   `;
 
   container.appendChild(wrap);
@@ -262,10 +311,12 @@ export async function render(container) {
 
   /* Botón actualizar: recarga contadores, feed y panel; re-dispara la caída de los carteles */
   wrap.querySelector('#nt-refresh').addEventListener('click', () => {
-    loadLedger(); loadFeed(); loadQuests(); loadEvents(); loadHonor();
+    loadLedger(); loadFeed(); loadQuests(); loadEvents(); loadHonor(); loadAdventurers(); loadClans();
   });
 
-  await Promise.allSettled([loadLedger(), loadFeed(), loadQuests(), loadEvents(), loadHonor()]);
+  await Promise.allSettled([
+    loadLedger(), loadFeed(), loadQuests(), loadEvents(), loadHonor(), loadAdventurers(), loadClans(),
+  ]);
 
   /* ── Libro mayor: contadores reales vía meta.total ── */
   async function loadLedger() {
@@ -450,5 +501,62 @@ export async function render(container) {
       aw.innerHTML = `🎖️ <b>«${ntEsc(a.title || '—')}»</b> → ${ntEsc(a.character_name || '—')}`;
       box.appendChild(aw);
     }
+  }
+
+  /* ── Nuevos Aventureros: /characters (N4) ── */
+  async function loadAdventurers() {
+    const box = wrap.querySelector('#nt-advs');
+    if (!box) return;
+    let chars = [];
+    try { chars = (await api.get('/characters?per_page=8')).data ?? []; } catch { /* ignore */ }
+    if (!chars.length) { box.innerHTML = '<div class="nt-empty-sm">Aún no hay personajes.</div>'; return; }
+
+    box.innerHTML = '';
+    chars.slice(0, 8).forEach(c => {
+      const lvl = c.level || 1;
+      const rar = lvl >= 15 ? 'L' : lvl >= 10 ? 'E' : lvl >= 5 ? 'R' : 'C';
+      const rc = RARITY[rar];
+      const meta = [c.race, c.char_class].filter(Boolean).join(' · ') || 'Aventurero';
+      const inner = c.portrait_url
+        ? `<img src="${ntEsc(c.portrait_url)}" alt="" onerror="this.style.display='none'">`
+        : ntClassEmoji(c.char_class);
+      const card = document.createElement('div');
+      card.className = 'nt-adv';
+      card.innerHTML = `
+        <div class="nt-adv-av" style="background:radial-gradient(circle at 34% 30%,${rc.c},${rc.d} 85%)">${inner}</div>
+        <div class="nt-adv-name">${ntEsc(c.name || '—')}</div>
+        <div class="nt-adv-meta">${ntEsc(meta)}</div>
+        <div class="nt-adv-lvl">Nivel ${lvl}</div>`;
+      box.appendChild(card);
+    });
+  }
+
+  /* ── Gremios: /clans (N4) ── */
+  async function loadClans() {
+    const box = wrap.querySelector('#nt-clans');
+    if (!box) return;
+    let clans = [];
+    try { clans = (await api.get('/clans?per_page=8')).data ?? []; } catch { /* ignore */ }
+    if (!clans.length) { box.innerHTML = '<div class="nt-empty-sm">No hay gremios fundados aún.</div>'; return; }
+
+    box.innerHTML = '';
+    clans.forEach(c => {
+      const color = c.color_hex || '#8a6d2f';
+      const initial = (c.name || '?').trim().charAt(0).toUpperCase();
+      const emb = c.emblem_url
+        ? `<img src="${ntEsc(c.emblem_url)}" alt="" onerror="this.style.display='none'">`
+        : ntEsc(initial);
+      const card = document.createElement('div');
+      card.className = 'nt-clan';
+      card.style.setProperty('--cc', color);
+      card.innerHTML = `
+        <div class="nt-clan-emb" style="background:${color}22;color:${color}">${emb}</div>
+        <div class="nt-clan-main">
+          <div class="nt-clan-name">${ntEsc(c.name || 'Gremio')}</div>
+          ${c.motto ? `<div class="nt-clan-motto">"${ntEsc(c.motto)}"</div>` : ''}
+          <div class="nt-clan-mem">👥 ${c.member_count || 0} miembros</div>
+        </div>`;
+      box.appendChild(card);
+    });
   }
 }
