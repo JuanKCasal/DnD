@@ -135,7 +135,7 @@ DnD/
 │       │                          #   seguridad (cambiar contraseña) y cerrar sesión
 │       ├── noticias.js            # #/noticias — Tablón de Misiones del gremio (portada; reemplazó a Dashboard)
 │       │                          #   hero + libro mayor + Crónica en vivo (feed /events con sellos de rareza, N2)
-│       │                          #   + panel: Misiones/Próximos Eventos/Salón de Honor (N3); aventureros/gremios en N4
+│       │                          #   + panel: Misiones/Próximos Eventos/Salón de Honor (N3); aventureros/gremios (N4)
 │       │                          #   (dashboard.js ELIMINADO — la app abre en #/noticias)
 │       ├── campaigns.js           # CRUD campañas + metadatos/progresión/reglas (C1);
 │       │                          #   modal de detalle con barra lateral de 9 pestañas (detalles/sesiones/

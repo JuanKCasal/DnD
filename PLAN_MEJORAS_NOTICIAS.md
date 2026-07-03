@@ -127,10 +127,22 @@ Enlaces cruzados: cada tarjeta enruta a su sección (`#/sessions`, `#/quests`, `
 - [x] Integrado en la carga inicial y en el botón **↻ Actualizar**; cada tarjeta degrada sola.
 - [x] Verificado por file-tool (archivo cierra íntegro en 454 líneas; mount del sandbox con glitches).
 
-### Fase N4 — Aventureros y Gremios ⏳
-- [ ] **Nuevos Aventureros**: fichas desde `/characters` (retrato o emoji de clase).
-- [ ] **Gremios**: tarjetas desde `/clans` (emblema/color/lema/miembros).
-- [ ] Enlaces cruzados a las secciones correspondientes.
+### Fase N4 — Aventureros y Gremios ✅ COMPLETADA
+- [x] **🧙 Nuevos Aventureros**: fichas desde `/characters?per_page=8` — avatar circular (retrato
+  real o **emoji de clase**) con gradiente de rareza por nivel (≥15 L, ≥10 E, ≥5 R), nombre,
+  raza·clase y badge "Nivel N"; hover `translateY(-6px)`.
+- [x] **🛡️ Gremios**: tarjetas desde `/clans?per_page=8` — emblema (imagen o inicial), borde
+  izquierdo con `color_hex`, nombre, lema en itálica y `👥 N miembros`.
+- [x] Integrado en carga inicial y en **↻ Actualizar**; degradan solas (`try/catch`).
+- [x] Verificado por file-tool (cierra íntegro en 562 líneas; mount del sandbox con glitches).
+
+### Fase N5 — Pulido + verificación ✅ (cubierta en N1–N4)
+- [x] `Promise.allSettled` en todas las cargas; cada sección degrada sola.
+- [x] Responsivo intrínseco (grids `auto-fill/auto-fit`, masonry `columns`, nav `flex-wrap`);
+  `@media (prefers-reduced-motion:reduce)` desactiva animaciones y el count-up salta al valor.
+- [x] Cache-bust en `index.html`; `CLAUDE.md` actualizado.
+- [ ] *(pendiente opcional)* `node --check` por consola quedó bloqueado por el desfase del
+  mount del sandbox; la integridad se validó con el editor de archivos.
 
 ### Fase N5 — Pulido + verificación ⏳
 - [ ] `Promise.allSettled` en todas las cargas; cada sección degrada sola.
