@@ -66,9 +66,35 @@ function injectStyle() {
   .nt-board.muro .nt-grid{columns:280px;column-gap:24px;}
   .nt-board.muro .nt-note{break-inside:avoid;display:inline-block;width:100%;margin:0 0 24px;}
 
-  /* Placeholder N1 (hasta N2) */
+  /* Placeholder / estado vacío */
   .nt-placeholder{text-align:center;color:var(--ink-soft);font-style:italic;font-size:16px;
     padding:60px 20px;border:1px dashed #cdb888;border-radius:10px;background:linear-gradient(158deg,#fdf8ec,#f0e6cc);}
+
+  /* Cartel de noticia (Crónica) */
+  .nt-note{position:relative;animation:dropPin .74s cubic-bezier(.2,.85,.25,1) both;}
+  .nt-note-body{position:relative;background:linear-gradient(158deg,#fdf8ec,#f0e6cc);border:1px solid #d8c79b;
+    border-radius:6px;padding:18px 17px 15px;box-shadow:inset 0 0 34px rgba(120,95,45,.09),0 10px 24px rgba(74,63,46,.16);
+    transition:transform .4s cubic-bezier(.2,.85,.25,1),box-shadow .4s;}
+  .nt-board.muro .nt-note-body{transform:rotate(var(--rot,0deg));}
+  .nt-board.tablon .nt-note-body{transform:none;}
+  .nt-note-body:hover{transform:rotate(0deg) translateY(-12px) scale(1.035)!important;
+    box-shadow:0 24px 48px rgba(74,63,46,.30),0 0 30px rgba(201,162,39,.5);}
+  .nt-note.leg .nt-note-body{border:2px solid #c9a227;animation:glowPulse 3.6s ease-in-out infinite 1.3s;}
+  .nt-pin{position:absolute;top:-9px;left:50%;margin-left:-8px;width:16px;height:16px;border-radius:50%;z-index:2;
+    background:radial-gradient(circle at 34% 30%,#f8e9ad,#bd952f 58%,#7a5d16);
+    box-shadow:0 3px 5px rgba(0,0,0,.36),inset 0 1px 1px rgba(255,255,255,.65);}
+  .nt-note-head{display:flex;gap:12px;align-items:flex-start;}
+  .nt-seal{width:46px;height:46px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+    border-radius:52% 48% 50% 50%/50% 52% 48% 50%;font-family:'Cinzel',serif;font-weight:700;font-size:21px;
+    color:#fdf6e3;text-shadow:0 1px 2px rgba(0,0,0,.45);animation:sealPop .5s cubic-bezier(.2,1.5,.4,1) both;
+    box-shadow:inset 0 2px 5px rgba(255,255,255,.35),inset 0 -3px 6px rgba(0,0,0,.35),0 3px 7px rgba(0,0,0,.28);}
+  .nt-text{font-size:16px;line-height:1.42;color:#4a3f2e;}
+  .nt-text .ic{font-size:18px;margin-right:2px;}
+  .nt-text b{color:#33291a;}
+  .nt-text .hl{color:#6f5620;font-weight:600;}
+  .nt-meta{margin-top:8px;font-size:11px;text-transform:uppercase;letter-spacing:.1em;}
+  .nt-meta .rar{font-weight:700;}
+  .nt-meta .time{color:#a08c5e;}
 
   @keyframes dropPin{0%{opacity:0;transform:translateY(-52px) rotate(-8deg) scale(.94)}55%{opacity:1}72%{transform:translateY(7px) rotate(1.4deg) scale(1.012)}100%{opacity:1;transform:translateY(0) rotate(0) scale(1)}}
   @keyframes sealPop{0%{transform:scale(0) rotate(-24deg);opacity:0}60%{transform:scale(1.2) rotate(7deg)}100%{transform:scale(1) rotate(0);opacity:1}}
@@ -92,6 +118,48 @@ function countUp(el, target) {
     if (p < 1) requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
+}
+
+/* Rarezas (letra del sello + colores) — según el prototipo. */
+const RARITY = {
+  C: { c: '#5a8a63', d: '#37623f', word: 'Común' },
+  R: { c: '#3f7fbf', d: '#204e78', word: 'Rara' },
+  E: { c: '#8058b0', d: '#4c2f74', word: 'Épica' },
+  L: { c: '#c9a227', d: '#8f1d1d', word: 'Legendaria' },
+};
+
+/* Mapa de acciones del event_log → icono, rareza y texto legible. */
+const FEED = {
+  'award.granted':        { icon: '🏅', rar: 'L', text: (e, a) => `<b>${a}</b> otorgó la condecoración <span class="hl">«${ntEsc(e.target_name || '—')}»</span>` },
+  'character.leveled_up': { icon: '⬆️', rar: 'E', text: (e, a) => `<b>${a}</b> alcanzó el <span class="hl">nivel ${ntLevel(e)}</span>` },
+  'clan.created':         { icon: '🛡️', rar: 'E', text: (e, a) => `<b>${a}</b> fundó el gremio <span class="hl">«${ntEsc(e.target_name || '—')}»</span>` },
+  'session.created':      { icon: '📜', rar: 'R', text: (e, a) => `<b>${a}</b> registró la crónica <span class="hl">«${ntEsc(e.target_name || 'una sesión')}»</span>` },
+  'clan.member_joined':   { icon: '🤝', rar: 'C', text: (e, a) => `<b>${a}</b> se unió a un gremio` },
+  'character.created':    { icon: '🧙', rar: 'C', text: (e, a) => `<b>${a}</b> dio vida a <span class="hl">«${ntEsc(e.target_name || 'un aventurero')}»</span>` },
+  'member.registered':    { icon: '🎉', rar: 'C', text: (e, a) => `<b>${a}</b> se unió al gremio` },
+};
+
+function ntEsc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+}
+function ntMeta(x) {
+  if (!x) return null;
+  if (typeof x === 'object') return x;
+  try { return JSON.parse(x); } catch { return null; }
+}
+function ntLevel(e) {
+  const m = ntMeta(e.metadata);
+  return (m && m.after && m.after.level != null) ? m.after.level : '?';
+}
+function ntRel(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  const s = (Date.now() - d.getTime()) / 1000;
+  if (s < 60) return 'hace un momento';
+  if (s < 3600) return `hace ${Math.floor(s / 60)} min`;
+  if (s < 86400) return `hace ${Math.floor(s / 3600)} h`;
+  if (s < 2592000) return `hace ${Math.floor(s / 86400)} d`;
+  return d.toLocaleDateString('es');
 }
 
 export async function render(container) {
@@ -151,10 +219,10 @@ export async function render(container) {
     board.classList.toggle('tablon', btn.dataset.v === 'tablon');
   });
 
-  /* Botón actualizar (N1: recarga contadores; el feed se conecta en N2) */
-  wrap.querySelector('#nt-refresh').addEventListener('click', loadLedger);
+  /* Botón actualizar: recarga contadores y re-dispara la caída de los carteles */
+  wrap.querySelector('#nt-refresh').addEventListener('click', () => { loadLedger(); loadFeed(); });
 
-  await loadLedger();
+  await Promise.allSettled([loadLedger(), loadFeed()]);
 
   /* ── Libro mayor: contadores reales vía meta.total ── */
   async function loadLedger() {
@@ -173,5 +241,60 @@ export async function render(container) {
         countUp(el, total);
       } catch { el.textContent = '—'; }
     }));
+  }
+
+  /* ── Crónica del Gremio: feed real desde /events (N2) ── */
+  async function loadFeed() {
+    const feed = wrap.querySelector('#nt-feed');
+    if (!feed) return;
+    feed.innerHTML = '<div class="nt-placeholder">Consultando el tablón del gremio…</div>';
+
+    let events = [], members = [];
+    const [evRes, memRes] = await Promise.allSettled([
+      api.get('/events?per_page=40'),
+      api.get('/members?per_page=200'),
+    ]);
+    if (evRes.status === 'fulfilled') events = evRes.value.data ?? [];
+    if (memRes.status === 'fulfilled') members = memRes.value.data ?? [];
+
+    const nameOf = {};
+    members.forEach(m => { nameOf[m.id] = m.display_name || m.username; });
+
+    const nodes = [];
+    events.forEach(e => {
+      const cfg = FEED[e.action];
+      if (!cfg) return;
+      const rar = RARITY[cfg.rar];
+      const actor = ntEsc(nameOf[e.actor_member_id] || e.target_name || 'Alguien');
+      const note = document.createElement('div');
+      note.className = 'nt-note' + (cfg.rar === 'L' ? ' leg' : '');
+      const rot = (Math.random() < 0.5 ? -1 : 1) * (1.3 + Math.random() * 1.3);
+      note.style.setProperty('--rot', rot.toFixed(2) + 'deg');
+      note.innerHTML = `
+        <div class="nt-note-body">
+          <span class="nt-pin"></span>
+          <div class="nt-note-head">
+            <div class="nt-seal" style="background:radial-gradient(circle at 34% 30%,rgba(255,255,255,.5),transparent 52%),radial-gradient(circle at 50% 55%,${rar.c},${rar.d} 80%)">${cfg.rar}</div>
+            <div>
+              <div class="nt-text"><span class="ic">${cfg.icon}</span>${cfg.text(e, actor)}</div>
+              <div class="nt-meta"><span class="rar" style="color:${rar.c}">${rar.word}</span> · <span class="time">${ntRel(e.occurred_at)}</span></div>
+            </div>
+          </div>
+        </div>`;
+      nodes.push(note);
+    });
+
+    if (!nodes.length) {
+      feed.innerHTML = '<div class="nt-placeholder">El tablón está en calma… aún no hay gestas que anunciar.</div>';
+      return;
+    }
+
+    feed.innerHTML = '';
+    nodes.forEach((note, i) => {
+      note.style.animationDelay = (0.1 + i * 0.09) + 's';
+      const seal = note.querySelector('.nt-seal');
+      if (seal) seal.style.animationDelay = (0.45 + i * 0.09) + 's';
+      feed.appendChild(note);
+    });
   }
 }

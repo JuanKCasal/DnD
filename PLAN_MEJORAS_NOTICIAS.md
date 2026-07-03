@@ -101,12 +101,19 @@ Enlaces cruzados: cada tarjeta enruta a su sección (`#/sessions`, `#/quests`, `
 - [x] Fondo animado global actualizado (nueva versión con dados D4/D8/D20 en `frontend/js/`).
 - [x] Verificado: `node --check pages/noticias.js`; `router.js` íntegro (file-tool).
 
-### Fase N2 — Crónica del Gremio (feed en vivo) ⏳
-- [ ] Cargar `/events` + mapa de nombres de `/members`.
-- [ ] `FEED_CONFIG` (icono, rango, texto legible, etiqueta) por acción; parseo seguro de
-  `metadata` y `occurred_at`; tiempo relativo en español.
-- [ ] Render de notas clavadas con sello de rango + estado vacío elegante.
-- [ ] Botón **Actualizar** (re-fetch sin recargar la página).
+### Fase N2 — Crónica del Gremio (feed en vivo) ✅ COMPLETADA
+- [x] Cargar `/events?per_page=40` + mapa de nombres de `/members` (`Promise.allSettled`).
+- [x] `FEED` (icono, **rareza C/R/E/L**, texto legible) por acción; parseo seguro de
+  `metadata` (string→JSON) para el nivel de `character.leveled_up`; tiempo relativo en español
+  desde `occurred_at`.
+- [x] Render de **carteles clavados** con chincheta de latón, **sello de cera por rareza**
+  (color radial c→d), texto (icono + actor en negrita + resaltado) y meta (rareza + tiempo);
+  entrada escalonada `dropPin`/`sealPop`; legendaria con borde dorado + `glowPulse`.
+- [x] Rotación aleatoria en variante **Muro** (se endereza en hover); sin rotación en **Tablón**.
+- [x] Estado vacío elegante ("El tablón está en calma…").
+- [x] Botón **↻ Actualizar** re-monta el feed (re-dispara la caída) + recarga contadores.
+- [x] Verificado (integridad y balance vía file-tool; el mount del sandbox tuvo glitches de
+  sincronización, ajenos al archivo real).
 
 ### Fase N3 — Panel lateral (misiones, eventos, honor) ⏳
 - [ ] **Misiones**: recorrer campañas → quests; agrupar abiertas/cumplidas; recompensas y rango.

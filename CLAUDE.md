@@ -134,7 +134,8 @@ DnD/
 │       │                          #   mensajes/personajes), personaje activo + grid, editar perfil,
 │       │                          #   seguridad (cambiar contraseña) y cerrar sesión
 │       ├── noticias.js            # #/noticias — Tablón de Misiones del gremio (portada; reemplazó a Dashboard)
-│       │                          #   hero + libro mayor (contadores) + tablón pergamino; feed/paneles en N2–N4
+│       │                          #   hero + libro mayor + Crónica en vivo (feed /events con sellos de rareza, N2);
+│       │                          #   paneles laterales/aventureros/gremios en N3–N4
 │       │                          #   (dashboard.js ELIMINADO — la app abre en #/noticias)
 │       ├── campaigns.js           # CRUD campañas + metadatos/progresión/reglas (C1);
 │       │                          #   modal de detalle con barra lateral de 9 pestañas (detalles/sesiones/
