@@ -141,7 +141,7 @@ export async function render(container) {
       }
 
       toast.success('¡Bienvenido!', 'Entrando al gremio...');
-      setTimeout(() => { location.hash = '#/dashboard'; }, 600);
+      setTimeout(() => { location.hash = '#/noticias'; }, 600);
     } catch (err) {
       toast.error('Error al iniciar sesión', err.message);
       shakeCard(card);
@@ -184,7 +184,7 @@ export async function render(container) {
       }
 
       toast.success('¡Cuenta creada!', 'Bienvenido al gremio');
-      setTimeout(() => { location.hash = '#/dashboard'; }, 600);
+      setTimeout(() => { location.hash = '#/noticias'; }, 600);
     } catch (err) {
       toast.error('Error al registrarse', err.message);
       shakeCard(card);

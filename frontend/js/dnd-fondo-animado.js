@@ -45,6 +45,19 @@
     [[-0.4,0.9,0,-0.4],[0,-0.4,0.4,0.9],[0,-0.4,0,-1]]                                       // Mannaz (cuña)
   ];
 
+  // Dados de rol en wireframe (proyecciones 2D, normalizadas a -1..1): D4, D8, D20
+  var DADOS = [
+    // D4 — tetraedro
+    [[0,-1,-0.87,0.55],[0,-1,0.87,0.55],[-0.87,0.55,0.87,0.55],[0,-1,0,0.2],[-0.87,0.55,0,0.2],[0.87,0.55,0,0.2]],
+    // D8 — octaedro
+    [[0,-1,0.9,0],[0.9,0,0,1],[0,1,-0.9,0],[-0.9,0,0,-1],[-0.9,0,0.9,0],[0,-1,0,1]],
+    // D20 — icosaedro
+    [[0,-1,0.87,-0.5],[0.87,-0.5,0.87,0.5],[0.87,0.5,0,1],[0,1,-0.87,0.5],[-0.87,0.5,-0.87,-0.5],[-0.87,-0.5,0,-1],
+     [0.52,-0.3,-0.52,-0.3],[-0.52,-0.3,0,0.6],[0,0.6,0.52,-0.3],
+     [0,-1,0.52,-0.3],[0,-1,-0.52,-0.3],[0.87,-0.5,0.52,-0.3],[-0.87,-0.5,-0.52,-0.3],
+     [0.87,0.5,0.52,-0.3],[0.87,0.5,0,0.6],[-0.87,0.5,-0.52,-0.3],[-0.87,0.5,0,0.6],[0,1,0,0.6]]
+  ];
+
   function crearInstancia(canvas, opciones) {
     opciones = opciones || {};
     var intensidad = opciones.intensidad != null ? opciones.intensidad : 1; // 0..~1.5
@@ -97,13 +110,46 @@
           estado.stars.push({ x: x, y: y, r: 0.7 + Math.random() * 1.5, a: 0.3 + Math.random() * 0.42, ph: Math.random() * 7, ts: 0.3 + Math.random() * 0.9 });
         }
       }
-      // runas nórdicas
+      // Regla anti-superposición SOLO entre dados y runas.
+      // Las motas de polvo y las constelaciones NO participan de esta regla.
+      var occupied = [];
+      function place(radius, zoneX, yFn, tries) {
+        var best = { x: zoneX(), y: yFn() }, bestGap = -Infinity;
+        for (var i = 0; i < tries; i++) {
+          var x = zoneX(), y = yFn(), gap = Infinity;
+          for (var q = 0; q < occupied.length; q++) {
+            var oc = occupied[q];
+            var d = Math.hypot(x - oc.x, y - oc.y) - oc.r - radius;
+            if (d < gap) gap = d;
+          }
+          if (gap > 8) { best = { x: x, y: y }; break; }
+          if (gap > bestGap) { bestGap = gap; best = { x: x, y: y }; }
+        }
+        occupied.push({ x: best.x, y: best.y, r: radius });
+        return best;
+      }
+      var dadoX = function () { return Math.random() < 0.5 ? w * (0.04 + Math.random() * 0.14) : w * (0.82 + Math.random() * 0.14); };
+      var dadoY = function () { return h * (0.14 + Math.random() * 0.72); };
+      var runaX = function () { return Math.random() < 0.5 ? Math.random() * w * 0.2 : w * (0.8 + Math.random() * 0.2); };
+      var runaY = function () { return h * (0.1 + Math.random() * 0.8); };
+
+      // dados de rol (uno de cada tipo) primero — mayor prioridad de espacio
+      estado.dice = [0, 1, 2].map(function (type, i) {
+        var s = 24 + Math.random() * 12;
+        var p = place(s * 1.05, dadoX, dadoY, 40);
+        return {
+          type: type, x: p.x, y: p.y, s: s, rot0: Math.random() * Math.PI * 2,
+          rotSpeed: (i % 2 ? 1 : -1) * (0.08 + Math.random() * 0.12),
+          ph: Math.random() * Math.PI * 2, ts: 0.12 + Math.random() * 0.1
+        };
+      });
+      // runas nórdicas, evitando los dados y entre sí
       estado.runes = [];
       for (var k = 0; k < 9; k++) {
-        var zx = Math.random() < 0.5 ? Math.random() * w * 0.2 : w * (0.8 + Math.random() * 0.2);
+        var rs = 12 + Math.random() * 12;
+        var rp = place(rs * 0.95, runaX, runaY, 40);
         estado.runes.push({
-          x: zx, y: h * (0.1 + Math.random() * 0.8),
-          s: 12 + Math.random() * 12, type: Math.floor(Math.random() * RUNAS.length),
+          x: rp.x, y: rp.y, s: rs, type: Math.floor(Math.random() * RUNAS.length),
           rot: (Math.random() - 0.5) * 0.4, ph: Math.random() * Math.PI * 2, ts: 0.1 + Math.random() * 0.12
         });
       }
@@ -130,6 +176,24 @@
       ctx.rotate(rn.rot);
       ctx.strokeStyle = 'rgba(' + COLOR_RUNA + ',' + al + ')';
       ctx.lineWidth = 1.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath();
+      for (var i = 0; i < segs.length; i++) {
+        var gsg = segs[i];
+        ctx.moveTo(gsg[0] * s, gsg[1] * s);
+        ctx.lineTo(gsg[2] * s, gsg[3] * s);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function dibujarDado(dd, al, t) {
+      var s = dd.s, segs = DADOS[dd.type];
+      var floatY = Math.sin(t * 0.4 + dd.ph) * s * 0.12;
+      ctx.save();
+      ctx.translate(dd.x, dd.y + floatY);
+      ctx.rotate(dd.rot0 + t * dd.rotSpeed);
+      ctx.strokeStyle = 'rgba(150,116,58,' + al + ')';
+      ctx.lineWidth = 1.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
       ctx.beginPath();
       for (var i = 0; i < segs.length; i++) {
         var gsg = segs[i];
@@ -191,6 +255,14 @@
         var cyc = 0.5 + 0.5 * Math.sin(t * rn.ts + rn.ph);
         var ra = 0.55 * edge(rn.x, w) * (0.32 + 0.68 * cyc) * intensidad;
         if (ra > 0.01) dibujarRuna(rn, ra);
+      }
+
+      // dados en wireframe, flotando y girando lento
+      for (var di = 0; di < estado.dice.length; di++) {
+        var dd = estado.dice[di];
+        var dcyc = 0.5 + 0.5 * Math.sin(t * dd.ts + dd.ph);
+        var da = 0.5 * edge(dd.x, w) * (0.4 + 0.6 * dcyc) * intensidad;
+        if (da > 0.01) dibujarDado(dd, da, t);
       }
 
       estado.raf = requestAnimationFrame(frame);

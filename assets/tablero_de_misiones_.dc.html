@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root{--parch:#f2ebdd;--ink:#4a3f2e;--ink-soft:#6f6046;--gold:#8a6d2f;--gold-deep:#6f5620;--gold-lite:#b89441;--crimson:#8f1d1d;--ease-spring:cubic-bezier(.2,.85,.25,1);}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:radial-gradient(1300px 900px at 22% -5%,#f8f2e7 0%,#f1e9d8 42%,#e8ddc5 100%) fixed;font-family:'EB Garamond',Georgia,serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+@keyframes dropPin{0%{opacity:0;transform:translateY(-52px) rotate(-8deg) scale(.94)}55%{opacity:1}72%{transform:translateY(7px) rotate(1.4deg) scale(1.012)}100%{opacity:1;transform:translateY(0) rotate(0) scale(1)}}
+@keyframes sealPop{0%{transform:scale(0) rotate(-24deg);opacity:0}60%{transform:scale(1.2) rotate(7deg)}100%{transform:scale(1) rotate(0);opacity:1}}
+@keyframes runeDrift{0%,100%{transform:translateY(0) rotate(0deg);opacity:.08}50%{transform:translateY(-16px) rotate(7deg);opacity:.2}}
+@keyframes dustRise{0%{transform:translateY(0) translateX(0);opacity:0}12%{opacity:.75}88%{opacity:.5}100%{transform:translateY(-150px) translateX(24px);opacity:0}}
+@keyframes glowPulse{0%,100%{box-shadow:inset 0 0 40px rgba(201,162,39,.16),0 12px 30px rgba(74,63,46,.2),0 0 0 rgba(201,162,39,0)}50%{box-shadow:inset 0 0 44px rgba(201,162,39,.28),0 12px 30px rgba(74,63,46,.2),0 0 26px rgba(201,162,39,.5)}}
+@keyframes heroGlow{0%,100%{text-shadow:0 2px 10px rgba(201,162,39,.25)}50%{text-shadow:0 2px 22px rgba(201,162,39,.55)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</helmet>
+<template id="__bundler_thumbnail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#e8ddc5"/><rect x="30" y="26" width="40" height="48" rx="3" fill="#fdf8ec" stroke="#8a6d2f" stroke-width="2" transform="rotate(-3 50 50)"/><circle cx="50" cy="50" r="10" fill="#c9a227" stroke="#8f1d1d" stroke-width="1.5"/><text x="50" y="55" font-family="Georgia,serif" font-size="12" font-weight="700" fill="#fdf6e3" text-anchor="middle">L</text><circle cx="50" cy="28" r="2.4" fill="#b8912f"/></svg></template>
+<div style="position:relative;min-height:100vh;overflow:hidden;padding-bottom:70px">
+
+  <sc-if value="{{ showRunes }}" hint-placeholder-val="{{ true }}">
+  <div aria-hidden="true" style="position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden">
+    <sc-for list="{{ runes }}" as="r" hint-placeholder-count="10">
+      <span style="{{ r.style }}">{{ r.g }}</span>
+    </sc-for>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ showDust }}" hint-placeholder-val="{{ true }}">
+  <div aria-hidden="true" style="position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden">
+    <sc-for list="{{ dust }}" as="d" hint-placeholder-count="12">
+      <span style="{{ d.style }}"></span>
+    </sc-for>
+  </div>
+  </sc-if>
+
+  <nav style="position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:26px;flex-wrap:wrap;padding:14px 34px;background:rgba(244,237,222,.82);backdrop-filter:blur(9px);border-bottom:1px solid rgba(138,109,47,.32);box-shadow:0 1px 14px rgba(74,63,46,.06)">
+    <div style="font-family:'Cinzel',serif;font-weight:700;font-size:20px;color:var(--gold-deep);letter-spacing:.05em;white-space:nowrap"><span style="color:var(--gold-lite);font-weight:500">+</span> DnD <span style="color:var(--gold-lite);font-weight:500">+</span></div>
+    <div style="display:flex;align-items:center;gap:22px;flex-wrap:wrap;font-family:'EB Garamond',serif;font-size:16px">
+      <span style="color:var(--gold-deep);font-weight:600;border-bottom:2px solid var(--gold);padding-bottom:2px">Noticias</span>
+      <span style="color:#8a7a5e;cursor:pointer">Dashboard</span>
+      <span style="color:#8a7a5e;cursor:pointer">Mi DnD ▾</span>
+      <span style="color:#8a7a5e;cursor:pointer">Juego ▾</span>
+      <span style="color:#8a7a5e;cursor:pointer">Comunidad ▾</span>
+      <span style="color:#8a7a5e;cursor:pointer">Configuración ▾</span>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:16px">
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 14px;background:#efe5cd;border:1px solid #d3bf8f;border-radius:8px;font-size:14px;color:var(--ink);white-space:nowrap">🐉 MyMarLa <span style="color:#a08c5e">▾</span></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(180deg,#f2e6c6,#e2cf9e);border:1.5px solid var(--gold);display:flex;align-items:center;justify-content:center;font-family:'Cinzel',serif;font-weight:700;color:var(--gold-deep)">J</div>
+        <div style="line-height:1.1"><div style="font-weight:600;font-size:14px;color:var(--ink)">JuanK</div><div style="font-size:11px;color:#a08c5e;letter-spacing:.04em">Admin</div></div>
+      </div>
+      <button style="padding:8px 16px;background:#efe5cd;border:1px solid #d3bf8f;border-radius:8px;font-family:'EB Garamond',serif;font-size:14px;color:var(--ink);cursor:pointer">Salir</button>
+    </div>
+  </nav>
+
+  <main style="position:relative;z-index:1;max-width:1240px;margin:0 auto;padding:44px 30px 0">
+
+    <header style="text-align:center;margin-bottom:8px">
+      <div style="font-size:34px;color:var(--gold-lite);line-height:1;margin-bottom:8px;animation:heroGlow 4s ease-in-out infinite">᛭</div>
+      <h1 style="margin:0;font-family:'Cinzel',serif;font-weight:700;font-size:clamp(30px,4.4vw,46px);color:var(--gold-deep);letter-spacing:.05em;text-shadow:0 2px 12px rgba(201,162,39,.28)"><span style="color:var(--gold-lite);font-weight:500;margin-right:.35em">+</span>Tablón de Misiones<span style="color:var(--gold-lite);font-weight:500;margin-left:.35em">+</span></h1>
+      <p style="margin:10px 0 0;font-size:18px;color:var(--ink-soft);font-style:italic">Gremio de Aventureros · {{ dateStr }}</p>
+    </header>
+
+    <div ref="{{ ledgerRef }}" style="display:flex;flex-wrap:wrap;justify-content:center;max-width:840px;margin:26px auto 0;background:linear-gradient(180deg,#f4ead0,#e7d6ae);border:1px solid #c9b382;border-radius:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.55),0 10px 24px rgba(74,63,46,.14);overflow:hidden">
+      <sc-for list="{{ counters }}" as="c" hint-placeholder-count="4">
+        <div style="{{ c.style }}">
+          <div data-count="{{ c.n }}" style="font-family:'Cinzel',serif;font-weight:700;font-size:clamp(28px,3.4vw,36px);color:var(--gold-deep);line-height:1">{{ c.n }}</div>
+          <div style="margin-top:6px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#9a8558">{{ c.label }}</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display:flex;justify-content:center;margin:30px 0 10px">
+      <div style="display:inline-flex;background:#ece0c4;border:1px solid #d3bf8f;border-radius:999px;padding:4px;gap:4px;box-shadow:inset 0 1px 3px rgba(90,66,25,.14)">
+        <button onClick="{{ setMuro }}" style="{{ muroBtnStyle }}">Muro del Gremio</button>
+        <button onClick="{{ setTablon }}" style="{{ tablonBtnStyle }}">Tablón Enmarcado</button>
+      </div>
+    </div>
+
+    <section style="margin-top:26px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+        <h2 style="margin:0;font-family:'Cinzel',serif;font-weight:700;font-size:23px;color:var(--gold-deep);letter-spacing:.05em"><span style="color:var(--gold-lite);font-weight:500;margin-right:.3em">+</span>Crónica del Gremio<span style="color:var(--gold-lite);font-weight:500;margin-left:.3em">+</span></h2>
+        <button onClick="{{ refresh }}" style="display:flex;align-items:center;gap:7px;padding:9px 17px;background:linear-gradient(180deg,#8a6d2f,#6f5620);border:none;border-radius:8px;color:#f7efdb;font-family:'Cinzel',serif;font-weight:600;font-size:13px;letter-spacing:.03em;cursor:pointer;box-shadow:0 4px 12px rgba(111,86,32,.34)">↻ Actualizar</button>
+      </div>
+
+      <div key="feed-{{ feedKey }}" style="{{ boardStyle }}">
+        <sc-if value="{{ isTablon }}" hint-placeholder-val="{{ false }}">
+          <span style="position:absolute;top:12px;left:14px;width:15px;height:15px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f6e6a8,#b8912f 60%,#6f5216);box-shadow:0 2px 5px rgba(0,0,0,.4),inset 0 1px 1px rgba(255,255,255,.6)"></span>
+          <span style="position:absolute;top:12px;right:14px;width:15px;height:15px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f6e6a8,#b8912f 60%,#6f5216);box-shadow:0 2px 5px rgba(0,0,0,.4),inset 0 1px 1px rgba(255,255,255,.6)"></span>
+          <span style="position:absolute;bottom:12px;left:14px;width:15px;height:15px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f6e6a8,#b8912f 60%,#6f5216);box-shadow:0 2px 5px rgba(0,0,0,.4),inset 0 1px 1px rgba(255,255,255,.6)"></span>
+          <span style="position:absolute;bottom:12px;right:14px;width:15px;height:15px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f6e6a8,#b8912f 60%,#6f5216);box-shadow:0 2px 5px rgba(0,0,0,.4),inset 0 1px 1px rgba(255,255,255,.6)"></span>
+        </sc-if>
+
+        <sc-for list="{{ feed }}" as="item" hint-placeholder-count="8">
+          <div style="{{ item.outerStyle }}">
+            <div style="position:relative;transform:rotate({{ item.rot }});transition:transform .4s cubic-bezier(.2,.85,.25,1),box-shadow .4s;{{ item.glow }}" style-hover="transform:rotate(0deg) translateY(-12px) scale(1.035);box-shadow:0 24px 48px rgba(74,63,46,.30),0 0 30px rgba(201,162,39,.5)">
+              <span style="position:absolute;top:-9px;left:50%;margin-left:-8px;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 34% 30%,#f8e9ad,#bd952f 58%,#7a5d16);box-shadow:0 3px 5px rgba(0,0,0,.36),inset 0 1px 1px rgba(255,255,255,.65);z-index:3"></span>
+              <div style="background:linear-gradient(158deg,#fdf8ec,#f0e6cc);border:{{ item.border }};border-radius:6px;padding:17px 17px 15px;box-shadow:inset 0 0 34px rgba(120,95,45,.09),0 10px 24px rgba(74,63,46,.16)">
+                <div style="display:flex;gap:14px;align-items:flex-start">
+                  <div style="flex:none;width:46px;height:46px;border-radius:52% 48% 50% 50%/50% 52% 48% 50%;background:radial-gradient(circle at 34% 30%,rgba(255,255,255,.5),transparent 52%),radial-gradient(circle at 50% 55%,{{ item.c }},{{ item.d }} 80%);color:#fdf6e3;display:flex;align-items:center;justify-content:center;font-family:'Cinzel',serif;font-weight:700;font-size:21px;text-shadow:0 1px 2px rgba(0,0,0,.45);box-shadow:inset 0 2px 5px rgba(255,255,255,.35),inset 0 -3px 6px rgba(0,0,0,.35),0 3px 7px rgba(0,0,0,.28);animation:sealPop .5s cubic-bezier(.2,1.5,.4,1) {{ item.sealDelay }} both">{{ item.rank }}</div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:16px;line-height:1.42;color:#4a3f2e"><span style="font-size:18px;margin-right:2px">{{ item.icon }}</span> <b style="color:#33291a">{{ item.actor }}</b> {{ item.action }} <span style="color:var(--gold-deep);font-weight:600">{{ item.hl }}</span></div>
+                    <div style="margin-top:9px;display:flex;gap:8px;align-items:center;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#a3906440">
+                      <span style="color:{{ item.c }};font-weight:700">{{ item.tier }}</span>
+                      <span style="color:#b6a276">·</span>
+                      <span style="color:#a08c5e">{{ item.time }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;margin-top:44px">
+
+      <div style="background:linear-gradient(160deg,#f6efdc,#ece0c2);border:1px solid #cdb888;border-radius:10px;box-shadow:0 8px 22px rgba(74,63,46,.13);padding:22px">
+        <h3 style="margin:0 0 16px;font-family:'Cinzel',serif;font-weight:700;font-size:18px;color:var(--gold-deep);letter-spacing:.04em">⚔ Misiones</h3>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <sc-for list="{{ quests }}" as="q" hint-placeholder-count="3">
+            <div style="display:flex;gap:12px;align-items:center;padding:11px 12px;background:rgba(255,252,244,.7);border:1px solid rgba(120,95,45,.16);border-radius:8px;{{ q.dim }}">
+              <div style="flex:none;width:34px;height:34px;border-radius:50% 48% 52% 50%/52% 50% 50% 48%;background:radial-gradient(circle at 40% 35%,{{ q.c }},{{ q.d }});color:#fdf6e3;display:flex;align-items:center;justify-content:center;font-family:'Cinzel',serif;font-weight:700;font-size:15px;box-shadow:inset 0 -2px 4px rgba(0,0,0,.3),0 2px 4px rgba(0,0,0,.22)">{{ q.rank }}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:15px;font-weight:600;color:var(--ink)">{{ q.name }}</div>
+                <div style="font-size:12.5px;color:#9a8558;margin-top:2px">✦ {{ q.xp }} XP · {{ q.gp }} oro · <span style="color:{{ q.statusColor }}">{{ q.status }}</span></div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="background:linear-gradient(160deg,#f6efdc,#ece0c2);border:1px solid #cdb888;border-radius:10px;box-shadow:0 8px 22px rgba(74,63,46,.13);padding:22px">
+        <h3 style="margin:0 0 16px;font-family:'Cinzel',serif;font-weight:700;font-size:18px;color:var(--gold-deep);letter-spacing:.04em">🗓 Próximos Eventos</h3>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <sc-for list="{{ events }}" as="e" hint-placeholder-count="3">
+            <div style="display:flex;gap:13px;align-items:center">
+              <div style="flex:none;width:46px;height:46px;border-radius:8px;background:linear-gradient(180deg,#8a6d2f,#6f5620);color:#f7efdb;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;box-shadow:0 3px 7px rgba(111,86,32,.3)"><span style="font-family:'Cinzel',serif;font-weight:700;font-size:18px">{{ e.day }}</span><span style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;margin-top:2px">{{ e.mon }}</span></div>
+              <div style="font-size:15px;font-weight:600;color:var(--ink)">{{ e.title }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="background:linear-gradient(160deg,#f6efdc,#ece0c2);border:1px solid #cdb888;border-radius:10px;box-shadow:0 8px 22px rgba(74,63,46,.13);padding:22px">
+        <h3 style="margin:0 0 16px;font-family:'Cinzel',serif;font-weight:700;font-size:18px;color:var(--gold-deep);letter-spacing:.04em">🏆 Salón de Honor</h3>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <sc-for list="{{ honor }}" as="h" hint-placeholder-count="5">
+            <div style="display:flex;align-items:center;gap:11px;font-size:15px">
+              <span style="flex:none;width:22px;text-align:center;font-family:'Cinzel',serif;font-weight:700;color:{{ h.col }}">{{ h.pos }}</span>
+              <span style="flex:1;color:var(--ink)">{{ h.name }}</span>
+              <span style="color:var(--gold-deep);font-weight:600;font-variant-numeric:tabular-nums">{{ h.xp }} XP</span>
+            </div>
+          </sc-for>
+          <div style="margin-top:12px;padding-top:12px;border-top:1px dashed rgba(120,95,45,.3);font-size:13.5px;color:var(--ink-soft)">🎖️ <b style="color:var(--gold-deep)">«Corazón de Dragón»</b> → MyMarLa</div>
+        </div>
+      </div>
+
+    </section>
+
+    <section style="margin-top:44px">
+      <h2 style="margin:0 0 20px;font-family:'Cinzel',serif;font-weight:700;font-size:23px;color:var(--gold-deep);letter-spacing:.05em"><span style="color:var(--gold-lite);font-weight:500;margin-right:.3em">+</span>Nuevos Aventureros<span style="color:var(--gold-lite);font-weight:500;margin-left:.3em">+</span></h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:18px">
+        <sc-for list="{{ aventureros }}" as="a" hint-placeholder-count="4">
+          <div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:20px 16px;background:linear-gradient(158deg,#fdf8ec,#f0e6cc);border:1px solid #d8c79b;border-radius:10px;box-shadow:0 8px 20px rgba(74,63,46,.14);transition:transform .3s,box-shadow .3s" style-hover="transform:translateY(-6px);box-shadow:0 16px 32px rgba(74,63,46,.2)">
+            <div style="width:66px;height:66px;border-radius:50%;background:radial-gradient(circle at 40% 35%,{{ a.c }},{{ a.d }});display:flex;align-items:center;justify-content:center;font-size:30px;box-shadow:inset 0 -3px 6px rgba(0,0,0,.28),0 4px 9px rgba(0,0,0,.2)">{{ a.emoji }}</div>
+            <div style="margin-top:12px;font-family:'Cinzel',serif;font-weight:600;font-size:17px;color:var(--ink)">{{ a.name }}</div>
+            <div style="font-size:13.5px;color:#9a8558;margin-top:3px">{{ a.race }} · {{ a.cls }}</div>
+            <div style="margin-top:9px;padding:3px 12px;background:#efe5cd;border:1px solid #d3bf8f;border-radius:999px;font-size:12px;color:var(--gold-deep);font-weight:600">Nivel {{ a.lvl }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="margin-top:44px">
+      <h2 style="margin:0 0 20px;font-family:'Cinzel',serif;font-weight:700;font-size:23px;color:var(--gold-deep);letter-spacing:.05em"><span style="color:var(--gold-lite);font-weight:500;margin-right:.3em">+</span>Gremios<span style="color:var(--gold-lite);font-weight:500;margin-left:.3em">+</span></h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px">
+        <sc-for list="{{ clanes }}" as="g" hint-placeholder-count="2">
+          <div style="display:flex;gap:16px;align-items:center;padding:20px;background:linear-gradient(158deg,#fdf8ec,#f0e6cc);border:1px solid #d8c79b;border-left:5px solid {{ g.color }};border-radius:10px;box-shadow:0 8px 20px rgba(74,63,46,.14)">
+            <div style="flex:none;width:56px;height:56px;border-radius:12px;background:{{ g.color }};display:flex;align-items:center;justify-content:center;font-family:'Cinzel',serif;font-weight:700;font-size:24px;color:#fdf6e3;box-shadow:inset 0 -3px 6px rgba(0,0,0,.3),0 4px 9px rgba(0,0,0,.2)">{{ g.initial }}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-family:'Cinzel',serif;font-weight:600;font-size:18px;color:var(--ink)">{{ g.name }}</div>
+              <div style="font-size:14px;color:var(--ink-soft);font-style:italic;margin-top:2px">«{{ g.motto }}»</div>
+              <div style="font-size:12.5px;color:#9a8558;margin-top:6px">👥 {{ g.members }} miembros</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <footer style="margin-top:52px;text-align:center;font-size:12.5px;color:#a3906480;letter-spacing:.05em">᛭ Gremio de Aventureros · Tablón vivo de #/noticias ᛭</footer>
+
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;variant&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;muro&quot;,&quot;tablon&quot;],&quot;default&quot;:&quot;muro&quot;,&quot;tsType&quot;:&quot;'muro'|'tablon'&quot;,&quot;section&quot;:&quot;Diseño&quot;},&quot;backgroundFx&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;runas+polvo&quot;,&quot;solo runas&quot;,&quot;ninguno&quot;],&quot;default&quot;:&quot;runas+polvo&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Ambiente&quot;},&quot;straighten&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Diseño&quot;}}">
+class Component extends DCLogic {
+  state = { variant: this.props.variant || 'muro', feedKey: 0 };
+
+  componentDidUpdate(prev) {
+    if (prev.variant !== this.props.variant && this.props.variant) {
+      this.setState({ variant: this.props.variant });
+    }
+  }
+
+  get RANKS() {
+    return {
+      C: { c: '#5a8a63', d: '#37623f', tier: 'Común' },
+      R: { c: '#3f7fbf', d: '#204e78', tier: 'Rara' },
+      E: { c: '#8058b0', d: '#4c2f74', tier: 'Épica' },
+      L: { c: '#c9a227', d: '#8f1d1d', tier: 'Legendaria' }
+    };
+  }
+
+  buildFeed() {
+    const R = this.RANKS;
+    const straight = !!this.props.straighten;
+    const variant = this.state.variant;
+    const raw = [
+      { icon: '🎖️', rank: 'L', actor: 'MyMarLa', action: 'recibió la condecoración', hl: '«Corazón de Dragón»', time: 'hace 2 horas' },
+      { icon: '⚔️', rank: 'E', actor: 'Borin', action: 'alcanzó el', hl: 'nivel 13', time: 'hace 5 horas' },
+      { icon: '🛡️', rank: 'E', actor: 'Aragon', action: 'fundó el gremio', hl: '«Los Vientos del Norte»', time: 'hace 8 horas' },
+      { icon: '📜', rank: 'R', actor: 'El cronista', action: 'registró la crónica', hl: '«La Cripta de Ceniza»', time: 'ayer' },
+      { icon: '🤝', rank: 'C', actor: 'Legolas', action: 'se unió a', hl: '«Los Vientos del Norte»', time: 'ayer' },
+      { icon: '✨', rank: 'C', actor: 'Thalindra', action: 'se unió como', hl: 'Semielfa · Pícara', time: 'hace 2 días' },
+      { icon: '⚔️', rank: 'E', actor: 'Legolas', action: 'alcanzó el', hl: 'nivel 2', time: 'hace 3 días' },
+      { icon: '🚪', rank: 'C', actor: 'Kael', action: 'se unió al gremio', hl: '', time: 'hace 3 días' }
+    ];
+    const rots = [-2.4, 1.9, -1.3, 2.6, -2.1, 1.4, -1.7, 2.3];
+    return raw.map((it, i) => {
+      const rk = R[it.rank];
+      const legendary = it.rank === 'L';
+      const anim = `animation:dropPin .74s cubic-bezier(.2,.85,.25,1) ${(0.1 + i * 0.09).toFixed(2)}s both;`;
+      const outerStyle = anim + (variant === 'muro'
+        ? 'break-inside:avoid;display:inline-block;width:100%;margin:0 0 24px;'
+        : '');
+      return {
+        ...it,
+        c: rk.c, d: rk.d, tier: rk.tier,
+        rot: straight ? '0deg' : rots[i] + 'deg',
+        sealDelay: (0.45 + i * 0.09).toFixed(2) + 's',
+        outerStyle,
+        border: legendary ? '2px solid #c9a227' : '1px solid #d8c79b',
+        glow: legendary ? 'animation:glowPulse 3.6s ease-in-out infinite 1.3s;' : ''
+      };
+    });
+  }
+
+  segBtn(active) {
+    return "padding:9px 18px;border:none;border-radius:999px;cursor:pointer;font-family:'Cinzel',serif;font-weight:600;font-size:13px;letter-spacing:.03em;transition:all .25s;white-space:nowrap;" +
+      (active
+        ? 'background:linear-gradient(180deg,#8a6d2f,#6f5620);color:#f7efdb;box-shadow:0 3px 9px rgba(111,86,32,.4);'
+        : 'background:transparent;color:#8a7350;');
+  }
+
+  boardStyle() {
+    if (this.state.variant === 'tablon') {
+      return 'position:relative;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:22px;padding:38px 30px;background:linear-gradient(160deg,#ecdab5,#ddc79b);border:3px solid #8a6d2f;border-radius:12px;box-shadow:inset 0 0 70px rgba(90,66,25,.26),0 16px 38px rgba(74,63,46,.24);outline:6px solid rgba(138,109,47,.22);outline-offset:5px;';
+    }
+    return 'columns:280px;column-gap:24px;';
+  }
+
+  _animateCounts(root) {
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+    root.querySelectorAll('[data-count]').forEach((el) => {
+      const target = parseInt(el.getAttribute('data-count'), 10) || 0;
+      if (reduce) { el.textContent = target.toLocaleString('es'); return; }
+      const dur = 1150;
+      const start = performance.now();
+      const step = (t) => {
+        const p = Math.min(1, (t - start) / dur);
+        const e = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.round(target * e).toLocaleString('es');
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    });
+  }
+
+  renderVals() {
+    const variant = this.state.variant;
+    const fx = this.props.backgroundFx || 'runas+polvo';
+    const dateStr = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    const counters = [
+      { n: 128, label: 'Miembros' },
+      { n: 12, label: 'Campañas' },
+      { n: 87, label: 'Sesiones' },
+      { n: 46, label: 'Personajes' }
+    ].map((c, i) => ({
+      ...c,
+      style: 'flex:1;min-width:150px;padding:20px 14px;text-align:center;' + (i > 0 ? 'border-left:1px solid rgba(120,95,45,.18);' : '')
+    }));
+
+    const R = this.RANKS;
+    const quests = [
+      { name: 'El Sello Roto de Vael', rank: 'L', xp: 2000, gp: 1000, status: 'Abierta', open: true },
+      { name: 'Rescate en el Paso de Kharn', rank: 'R', xp: 500, gp: 200, status: 'Abierta', open: true },
+      { name: 'La Caravana Perdida', rank: 'C', xp: 300, gp: 120, status: 'Cumplida', open: false }
+    ].map((q) => ({
+      ...q, c: R[q.rank].c, d: R[q.rank].d,
+      statusColor: q.open ? '#5a8a63' : '#a08c5e',
+      dim: q.open ? '' : 'opacity:.62;'
+    }));
+
+    const events = [
+      { day: '08', mon: 'Jul', title: 'Asamblea del Gremio' },
+      { day: '15', mon: 'Jul', title: 'Torneo de Duelos' },
+      { day: '22', mon: 'Jul', title: 'Mercado de Reliquias' }
+    ];
+
+    const honorRaw = [
+      { pos: 1, name: 'MyMarLa', xp: '4.820' },
+      { pos: 2, name: 'Borin', xp: '3.110' },
+      { pos: 3, name: 'Aragon', xp: '2.740' },
+      { pos: 4, name: 'Legolas', xp: '1.980' },
+      { pos: 5, name: 'Kael', xp: '640' }
+    ];
+    const honorCols = { 1: '#c9a227', 2: '#9a8a66', 3: '#a9743a' };
+    const honor = honorRaw.map((h) => ({ ...h, col: honorCols[h.pos] || '#b6a276' }));
+
+    const aventureros = [
+      { name: 'Thalindra', race: 'Semielfa', cls: 'Pícara', lvl: 1, emoji: '🗡️', c: '#5a8a63', d: '#37623f' },
+      { name: 'Kael', race: 'Humano', cls: 'Paladín', lvl: 1, emoji: '🛡️', c: '#c9a227', d: '#8a6d2f' },
+      { name: 'Borin', race: 'Enano', cls: 'Mago', lvl: 13, emoji: '🧙', c: '#8058b0', d: '#4c2f74' },
+      { name: 'MyMarLa', race: 'Elfo', cls: 'Clérigo', lvl: 1, emoji: '✨', c: '#3f7fbf', d: '#204e78' }
+    ];
+
+    const clanes = [
+      { name: 'Los Vientos del Norte', motto: 'Nada nos detiene', members: 6, color: '#3f7fbf', initial: 'V' },
+      { name: 'Guardia de Ceniza', motto: 'De las cenizas, acero', members: 4, color: '#8f1d1d', initial: 'G' }
+    ];
+
+    const runeGlyphs = ['ᚠ', 'ᚢ', 'ᚦ', 'ᚨ', 'ᚱ', 'ᚷ', 'ᚹ', 'ᚺ', 'ᛁ', 'ᛃ', 'ᛚ', 'ᛟ'];
+    const runePos = [
+      [7, 5, 46, 0, 12], [15, 90, 38, 2, 14], [30, 12, 30, 4, 11], [42, 84, 44, 1, 13],
+      [58, 6, 34, 3, 15], [66, 94, 40, 5, 12], [78, 14, 30, 2, 14], [85, 88, 46, 0, 13],
+      [22, 50, 26, 6, 16], [50, 46, 30, 4, 12], [92, 40, 34, 3, 15], [38, 30, 24, 1, 11]
+    ];
+    const runes = runePos.map((p, i) => ({
+      g: runeGlyphs[i % runeGlyphs.length],
+      style: `position:absolute;top:${p[0]}%;left:${p[1]}%;font-size:${p[2]}px;color:rgba(138,109,47,.5);animation:runeDrift ${p[4]}s ease-in-out ${p[3]}s infinite;will-change:transform,opacity`
+    }));
+
+    const dustPos = [
+      [8, 4, 0, 9], [18, 3, 2, 11], [28, 5, 4, 10], [38, 3, 1, 12], [48, 4, 5, 9],
+      [58, 5, 3, 11], [68, 3, 0, 10], [78, 4, 2, 12], [88, 3, 4, 9], [14, 4, 6, 13],
+      [64, 3, 1, 10], [92, 5, 3, 11]
+    ];
+    const dust = dustPos.map((p) => ({
+      style: `position:absolute;bottom:-12px;left:${p[0]}%;width:${p[1]}px;height:${p[1]}px;border-radius:50%;background:radial-gradient(circle,rgba(201,162,39,.9),rgba(201,162,39,0));animation:dustRise ${p[3]}s linear ${p[2]}s infinite;will-change:transform,opacity`
+    }));
+
+    return {
+      variant,
+      isMuro: variant === 'muro',
+      isTablon: variant === 'tablon',
+      feedKey: this.state.feedKey,
+      setMuro: () => this.setState({ variant: 'muro' }),
+      setTablon: () => this.setState({ variant: 'tablon' }),
+      refresh: () => this.setState((s) => ({ feedKey: s.feedKey + 1 })),
+      muroBtnStyle: this.segBtn(variant === 'muro'),
+      tablonBtnStyle: this.segBtn(variant === 'tablon'),
+      boardStyle: this.boardStyle(),
+      showRunes: fx === 'runas+polvo' || fx === 'solo runas',
+      showDust: fx === 'runas+polvo',
+      dateStr,
+      counters, quests, events, honor, aventureros, clanes, runes, dust,
+      feed: this.buildFeed(),
+      ledgerRef: (el) => { if (el && !this._counted) { this._counted = true; this._animateCounts(el); } }
+    };
+  }
+}
+</script>
+</body>
+</html>

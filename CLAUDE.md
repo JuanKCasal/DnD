@@ -133,7 +133,9 @@ DnD/
 │       ├── profile.js             # #/perfil — Mi DnD > Perfil: cabecera+datos, estadísticas (XP/sesiones/
 │       │                          #   mensajes/personajes), personaje activo + grid, editar perfil,
 │       │                          #   seguridad (cambiar contraseña) y cerrar sesión
-│       ├── dashboard.js           # 5 stats de comunidad en tiempo real
+│       ├── noticias.js            # #/noticias — Tablón de Misiones del gremio (portada; reemplazó a Dashboard)
+│       │                          #   hero + libro mayor (contadores) + tablón pergamino; feed/paneles en N2–N4
+│       │                          #   (dashboard.js ELIMINADO — la app abre en #/noticias)
 │       ├── campaigns.js           # CRUD campañas + metadatos/progresión/reglas (C1);
 │       │                          #   modal de detalle con barra lateral de 9 pestañas (detalles/sesiones/
 │       │                          #   quests/encuentros/trama/compendio/tesoros/DM/personajes) +
@@ -335,8 +337,8 @@ La app debe sentirse como un **artefacto del mundo de D&D digitalizado**: pergam
 
 Estructura del mega-menu (en `router.js`, constante `NAV_GROUPS`):
 
-- **Noticias** *(deshabilitado)*
-- **Dashboard** → `#/dashboard`
+- **Noticias** → `#/noticias` (portada / landing tras login; Tablón de Misiones)
+- *(Dashboard eliminado — la app ahora abre en Noticias)*
 - **Mi DnD:** Perfil `#/perfil`, Personajes `#/characters`, Inventario `#/inventory`
 - **Juego:** Campañas `#/campaigns`, Sesiones `#/sessions`, Tesoros `#/treasury`, Aventuras & Misiones `#/quests`, Encuentros `#/encounters`, Trama `#/narrative`, Compendio `#/world`
 - **Comunidad:** Chat `#/chat`, Calendario & Eventos `#/calendario`, Clanes `#/clanes`, Salón de la Fama `#/fama` (CM1–CM6)

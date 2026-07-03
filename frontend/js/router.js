@@ -3,7 +3,7 @@ import { api } from './api.js';
 
 const routes = {
   '#/login':      () => import('../pages/login.js').then(m => m.render),
-  '#/dashboard':  () => import('../pages/dashboard.js').then(m => m.render),
+  '#/noticias':   () => import('../pages/noticias.js').then(m => m.render),
   '#/perfil':     () => import('../pages/profile.js').then(m => m.render),
   '#/campaigns':  () => import('../pages/campaigns.js').then(m => m.render),
   '#/characters': () => import('../pages/characters.js').then(m => m.render),
@@ -31,12 +31,6 @@ const NAV_GROUPS = [
     type: 'link',
     label: 'Noticias',
     route: '#/noticias',
-    disabled: true,
-  },
-  {
-    type: 'link',
-    label: 'Dashboard',
-    route: '#/dashboard',
   },
   {
     type: 'dropdown',
@@ -118,7 +112,7 @@ function renderShell(user) {
   const brand = document.createElement('span');
   brand.className = 'nav-brand';
   brand.textContent = '᛭ DnD ᛭';
-  brand.addEventListener('click', () => { location.hash = '#/dashboard'; });
+  brand.addEventListener('click', () => { location.hash = '#/noticias'; });
   inner.appendChild(brand);
 
   /* Nav links (desktop) */
@@ -481,7 +475,7 @@ async function navigate() {
     closeDrawer();
   }
 
-  const loader = routes[hash] || routes['#/dashboard'];
+  const loader = routes[hash] || routes['#/noticias'];
   const container = isPublic ? app : document.getElementById('page-content');
   if (!container) return;
 

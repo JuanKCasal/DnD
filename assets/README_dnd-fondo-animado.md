@@ -1,8 +1,9 @@
 # Fondo animado D&D
 
 Fondo animado sutil para tu app de calabozos y dragones: **motas de polvo**
-flotando + **constelaciones** y **runas nórdicas del Futhark** que titilan, con
-un **brillo cálido tipo vela** en los laterales. El movimiento se concentra en
+flotando + **constelaciones** y **runas nórdicas del Futhark** que titilan +
+**dados en wireframe (D4, D8, D20)** que flotan y giran lento, con un
+**brillo cálido tipo vela** en los laterales. El movimiento se concentra en
 los bordes y casi desaparece en el centro para no competir con tu interfaz.
 
 Es JavaScript puro, sin dependencias ni build.
