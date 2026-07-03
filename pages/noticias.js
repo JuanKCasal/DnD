@@ -96,6 +96,32 @@ function injectStyle() {
   .nt-meta .rar{font-weight:700;}
   .nt-meta .time{color:#a08c5e;}
 
+  /* Panel lateral (Misiones / Eventos / Honor) */
+  .nt-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;margin-top:44px;}
+  .nt-card{background:linear-gradient(160deg,#f6efdc,#ece0c2);border:1px solid #cdb888;border-radius:10px;
+    box-shadow:0 8px 22px rgba(74,63,46,.13);padding:22px;}
+  .nt-card-title{font-family:'Cinzel',serif;font-weight:700;font-size:18px;color:#6f5620;margin:0 0 12px;}
+  .nt-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid rgba(120,95,45,.14);}
+  .nt-row:first-of-type{border-top:none;}
+  .nt-row.done{opacity:.62;}
+  .nt-row-main{flex:1;min-width:0;}
+  .nt-row-name{font-size:15px;font-weight:600;color:#4a3f2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .nt-row-sub{font-size:12px;color:#9a8558;margin-top:1px;}
+  .nt-est-open{color:#5a8a63;font-weight:600;}
+  .nt-est-done{color:#a08c5e;font-weight:600;}
+  .nt-mini-seal{width:34px;height:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+    border-radius:52% 48% 50% 50%/50% 52% 48% 50%;font-family:'Cinzel',serif;font-weight:700;font-size:15px;color:#fdf6e3;
+    text-shadow:0 1px 2px rgba(0,0,0,.4);box-shadow:inset 0 1px 3px rgba(255,255,255,.3),inset 0 -2px 4px rgba(0,0,0,.3),0 2px 4px rgba(0,0,0,.24);}
+  .nt-date{width:46px;height:46px;flex-shrink:0;border-radius:8px;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;background:linear-gradient(180deg,#8a6d2f,#6f5620);color:#f7efdb;}
+  .nt-date .d{font-family:'Cinzel',serif;font-weight:700;font-size:18px;line-height:1;}
+  .nt-date .m{font-size:9px;text-transform:uppercase;letter-spacing:.08em;margin-top:2px;}
+  .nt-pos{width:24px;flex-shrink:0;text-align:center;font-family:'Cinzel',serif;font-weight:700;font-size:16px;}
+  .nt-honor-xp{font-family:'JetBrains Mono',monospace;font-size:12px;color:#6f5620;}
+  .nt-divider{border-top:1px dashed #c9b382;margin:14px 0 10px;}
+  .nt-award{font-size:13px;color:#6f6046;}
+  .nt-empty-sm{font-size:13px;color:#9a8558;font-style:italic;padding:8px 0;}
+
   @keyframes dropPin{0%{opacity:0;transform:translateY(-52px) rotate(-8deg) scale(.94)}55%{opacity:1}72%{transform:translateY(7px) rotate(1.4deg) scale(1.012)}100%{opacity:1;transform:translateY(0) rotate(0) scale(1)}}
   @keyframes sealPop{0%{transform:scale(0) rotate(-24deg);opacity:0}60%{transform:scale(1.2) rotate(7deg)}100%{transform:scale(1) rotate(0);opacity:1}}
   @keyframes glowPulse{0%,100%{box-shadow:inset 0 0 40px rgba(201,162,39,.16),0 12px 30px rgba(74,63,46,.2),0 0 0 rgba(201,162,39,0)}50%{box-shadow:inset 0 0 44px rgba(201,162,39,.28),0 12px 30px rgba(74,63,46,.2),0 0 26px rgba(201,162,39,.5)}}
@@ -205,6 +231,21 @@ export async function render(container) {
         </div>
       </div>
     </div>
+
+    <div class="nt-panel" id="nt-panel">
+      <div class="nt-card">
+        <h3 class="nt-card-title">⚔ Misiones</h3>
+        <div id="nt-quests"><div class="nt-empty-sm">Cargando…</div></div>
+      </div>
+      <div class="nt-card">
+        <h3 class="nt-card-title">🗓 Próximos Eventos</h3>
+        <div id="nt-events"><div class="nt-empty-sm">Cargando…</div></div>
+      </div>
+      <div class="nt-card">
+        <h3 class="nt-card-title">🏆 Salón de Honor</h3>
+        <div id="nt-honor"><div class="nt-empty-sm">Cargando…</div></div>
+      </div>
+    </div>
   `;
 
   container.appendChild(wrap);
@@ -219,10 +260,12 @@ export async function render(container) {
     board.classList.toggle('tablon', btn.dataset.v === 'tablon');
   });
 
-  /* Botón actualizar: recarga contadores y re-dispara la caída de los carteles */
-  wrap.querySelector('#nt-refresh').addEventListener('click', () => { loadLedger(); loadFeed(); });
+  /* Botón actualizar: recarga contadores, feed y panel; re-dispara la caída de los carteles */
+  wrap.querySelector('#nt-refresh').addEventListener('click', () => {
+    loadLedger(); loadFeed(); loadQuests(); loadEvents(); loadHonor();
+  });
 
-  await Promise.allSettled([loadLedger(), loadFeed()]);
+  await Promise.allSettled([loadLedger(), loadFeed(), loadQuests(), loadEvents(), loadHonor()]);
 
   /* ── Libro mayor: contadores reales vía meta.total ── */
   async function loadLedger() {
@@ -296,5 +339,116 @@ export async function render(container) {
       if (seal) seal.style.animationDelay = (0.45 + i * 0.09) + 's';
       feed.appendChild(note);
     });
+  }
+
+  /* ── Misiones: recorre campañas → quests, agrupa abiertas/cumplidas (N3) ── */
+  async function loadQuests() {
+    const box = wrap.querySelector('#nt-quests');
+    if (!box) return;
+    let campaigns = [];
+    try { campaigns = (await api.get('/campaigns?per_page=12')).data ?? []; } catch { /* ignore */ }
+    if (!campaigns.length) { box.innerHTML = '<div class="nt-empty-sm">Sin campañas todavía.</div>'; return; }
+
+    const results = await Promise.allSettled(
+      campaigns.slice(0, 8).map(c => api.get(`/campaigns/${c.id}/quests`))
+    );
+    const quests = [];
+    results.forEach(res => { if (res.status === 'fulfilled') (res.value.data ?? []).forEach(q => quests.push(q)); });
+    if (!quests.length) { box.innerHTML = '<div class="nt-empty-sm">No hay misiones publicadas.</div>'; return; }
+
+    const open = quests.filter(q => q.status === 'active');
+    const done = quests.filter(q => q.status === 'completed');
+    const list = [...open, ...done].slice(0, 6);
+
+    box.innerHTML = '';
+    list.forEach(q => {
+      const xp = q.reward_xp || 0, gp = Number(q.reward_gp || 0);
+      const rar = xp >= 1000 ? 'L' : xp >= 500 ? 'E' : xp >= 100 ? 'R' : 'C';
+      const rc = RARITY[rar];
+      const isDone = q.status === 'completed';
+      const estado = isDone ? '<span class="nt-est-done">Cumplida</span>' : '<span class="nt-est-open">Abierta</span>';
+      const row = document.createElement('div');
+      row.className = 'nt-row' + (isDone ? ' done' : '');
+      row.innerHTML = `
+        <div class="nt-mini-seal" style="background:radial-gradient(circle at 34% 30%,rgba(255,255,255,.45),transparent 52%),radial-gradient(circle at 50% 55%,${rc.c},${rc.d} 80%)">${rar}</div>
+        <div class="nt-row-main">
+          <div class="nt-row-name">${ntEsc(q.title || 'Misión')}</div>
+          <div class="nt-row-sub">✦ ${xp} XP · ${gp} oro · ${estado}</div>
+        </div>`;
+      box.appendChild(row);
+    });
+  }
+
+  /* ── Próximos Eventos: /community/posts?board=events (N3) ── */
+  async function loadEvents() {
+    const box = wrap.querySelector('#nt-events');
+    if (!box) return;
+    let posts = [];
+    try { posts = (await api.get('/community/posts?board=events')).data ?? []; } catch { /* ignore */ }
+
+    const withDate = posts.filter(p => p.event_date);
+    withDate.sort((a, b) => new Date(a.event_date) - new Date(b.event_date));
+    const now = Date.now();
+    const upcoming = withDate.filter(p => new Date(p.event_date).getTime() >= now - 86400000);
+    const list = (upcoming.length ? upcoming : withDate).slice(0, 5);
+
+    if (!list.length) { box.innerHTML = '<div class="nt-empty-sm">No hay eventos próximos.</div>'; return; }
+
+    box.innerHTML = '';
+    list.forEach(p => {
+      const d = new Date(p.event_date);
+      const valid = !isNaN(d.getTime());
+      const day = valid ? d.getDate() : '—';
+      const mon = valid ? d.toLocaleDateString('es', { month: 'short' }).replace('.', '').toUpperCase() : '';
+      const row = document.createElement('div');
+      row.className = 'nt-row';
+      row.innerHTML = `
+        <div class="nt-date"><span class="d">${day}</span><span class="m">${mon}</span></div>
+        <div class="nt-row-main">
+          <div class="nt-row-name">${ntEsc(p.title || 'Evento')}</div>
+          ${valid ? `<div class="nt-row-sub">${d.toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' })}</div>` : ''}
+        </div>`;
+      box.appendChild(row);
+    });
+  }
+
+  /* ── Salón de Honor: leaderboard top 5 + última condecoración (N3) ── */
+  async function loadHonor() {
+    const box = wrap.querySelector('#nt-honor');
+    if (!box) return;
+    const [lbRes, awRes] = await Promise.allSettled([
+      api.get('/hall/leaderboard'),
+      api.get('/hall/awards'),
+    ]);
+    const board = lbRes.status === 'fulfilled' ? (lbRes.value.data ?? []) : [];
+    const awards = awRes.status === 'fulfilled' ? (awRes.value.data ?? []) : [];
+
+    box.innerHTML = '';
+    if (!board.length) {
+      box.innerHTML = '<div class="nt-empty-sm">Aún no hay ranking.</div>';
+    } else {
+      board.slice(0, 5).forEach((m, i) => {
+        const pos = i + 1;
+        const col = pos === 1 ? '#c9a227' : pos === 2 ? '#9a8a66' : pos === 3 ? '#a9743a' : '#b6a276';
+        const row = document.createElement('div');
+        row.className = 'nt-row';
+        row.innerHTML = `
+          <div class="nt-pos" style="color:${col}">${pos}</div>
+          <div class="nt-row-main"><div class="nt-row-name">${ntEsc(m.display_name || m.username || '—')}</div></div>
+          <div class="nt-honor-xp">${Number(m.total_xp || 0).toLocaleString('es')} XP</div>`;
+        box.appendChild(row);
+      });
+    }
+
+    if (awards.length) {
+      const a = awards[0];
+      const div = document.createElement('div');
+      div.className = 'nt-divider';
+      box.appendChild(div);
+      const aw = document.createElement('div');
+      aw.className = 'nt-award';
+      aw.innerHTML = `🎖️ <b>«${ntEsc(a.title || '—')}»</b> → ${ntEsc(a.character_name || '—')}`;
+      box.appendChild(aw);
+    }
   }
 }
